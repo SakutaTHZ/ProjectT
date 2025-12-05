@@ -1,0 +1,5 @@
+{
+  "name": "Soul Rotation TCG",
+  "description": "A tactical TCG where players manage rotating character triangles and use soul points to cast spells.",
+  "requestFramePermissions": []
+}

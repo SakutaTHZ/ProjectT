@@ -1,0 +1,181 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Soul Rotation TCG</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Cinzel:wght@400;700&family=Inter:wght@400;600&display=swap" rel="stylesheet">
+    <style>
+      body {
+        font-family: 'Inter', sans-serif;
+        background-color: #050505; /* Neutral-950/Black */
+        color: #fce7f3; /* Very light gold/pink tint */
+        overflow: hidden;
+      }
+      .font-fantasy {
+        font-family: 'Cinzel', serif;
+      }
+      
+      /* Custom Gold Scrollbar */
+      ::-webkit-scrollbar {
+        width: 6px;
+      }
+      ::-webkit-scrollbar-track {
+        background: #0f0f0f;
+      }
+      ::-webkit-scrollbar-thumb {
+        background: #b45309; /* Amber-700 */
+        border-radius: 3px;
+      }
+      ::-webkit-scrollbar-thumb:hover {
+        background: #f59e0b; /* Amber-500 */
+      }
+
+      .card-hover:hover {
+        transform: translateY(-40px) scale(1.1) !important;
+        z-index: 100 !important;
+      }
+      
+      .glow-text {
+        text-shadow: 0 0 10px rgba(251, 191, 36, 0.5); /* Amber glow */
+      }
+
+      /* PLUS SHAPE SLOT */
+      .slot-plus {
+        clip-path: polygon(
+          30% 0, 70% 0, 
+          70% 25%, 100% 25%, 
+          100% 75%, 70% 75%, 
+          70% 100%, 30% 100%, 
+          30% 75%, 0 75%, 
+          0 25%, 30% 25%
+        );
+      }
+
+      /* Animations */
+      @keyframes drawCard {
+        0% { transform: translateY(100%) scale(0.5) rotate(-10deg); opacity: 0; }
+        100% { opacity: 1; }
+      }
+      @keyframes drawCardOpponent {
+        0% { transform: translateY(-100%) scale(0.5); opacity: 0; }
+        100% { opacity: 1; }
+      }
+      .animate-draw { animation: drawCard 0.6s cubic-bezier(0.175, 0.885, 0.32, 1.275) forwards; }
+      .animate-draw-opponent { animation: drawCardOpponent 0.6s cubic-bezier(0.175, 0.885, 0.32, 1.275) forwards; }
+
+      @keyframes pulse-glow {
+        0%, 100% { box-shadow: 0 0 10px rgba(217, 119, 6, 0.5); } /* Amber-600 */
+        50% { box-shadow: 0 0 25px rgba(251, 191, 36, 0.8); } /* Amber-400 */
+      }
+      .soul-pulse { animation: pulse-glow 2s infinite; }
+
+      @keyframes shake-red {
+        0% { transform: translate(0, 0); filter: brightness(1); }
+        10%, 90% { transform: translate(-5px, 0); filter: brightness(2) sepia(1) hue-rotate(-50deg) saturate(5); }
+        20%, 80% { transform: translate(5px, 0); }
+        30%, 50%, 70% { transform: translate(-5px, 0); }
+        40%, 60% { transform: translate(5px, 0); }
+        100% { transform: translate(0, 0); filter: brightness(1); }
+      }
+      .animate-shake-red { animation: shake-red 0.5s cubic-bezier(.36,.07,.19,.97) both; }
+
+      @keyframes float-green {
+        0% { transform: translateY(0); opacity: 0.5; box-shadow: 0 0 0 rgba(34, 197, 94, 0); }
+        50% { transform: translateY(-10px); opacity: 1; box-shadow: 0 0 20px rgba(34, 197, 94, 0.6); }
+        100% { transform: translateY(0); opacity: 1; box-shadow: 0 0 0 rgba(34, 197, 94, 0); }
+      }
+      .animate-heal-green { animation: float-green 0.8s ease-out; border-color: #4ade80 !important; }
+      
+      /* --- SPELL CASTING ANIMATIONS --- */
+      
+      /* ATTACK: Aggressive lunging shake + Red Glow */
+      @keyframes cast-attack {
+        0% { transform: scale(1); filter: brightness(1); }
+        40% { transform: scale(1.3) translateY(-10px) rotate(-5deg); filter: brightness(1.5) drop-shadow(0 0 20px rgba(220, 38, 38, 0.8)); }
+        60% { transform: scale(1.3) translateY(-10px) rotate(5deg); }
+        100% { transform: scale(0.5) translateY(-100px); opacity: 0; filter: brightness(3); }
+      }
+      .animate-cast-ATTACK { animation: cast-attack 0.7s ease-in forwards; z-index: 100 !important; position: relative; }
+
+      /* HEAL: Gentle float up + Green Aura */
+      @keyframes cast-heal {
+        0% { transform: scale(1); filter: brightness(1); }
+        50% { transform: scale(1.2) translateY(-20px); filter: brightness(1.2) drop-shadow(0 0 25px rgba(34, 197, 94, 0.8)); }
+        100% { transform: scale(1.4) translateY(-50px); opacity: 0; filter: blur(4px); }
+      }
+      .animate-cast-HEAL { animation: cast-heal 0.8s ease-out forwards; z-index: 100 !important; position: relative; }
+
+      /* TRAP: Pulse + Amber */
+      @keyframes cast-trap {
+        0% { transform: scale(1); }
+        20% { transform: scale(0.9); }
+        60% { transform: scale(1.4); filter: drop-shadow(0 0 30px rgba(245, 158, 11, 0.9)); }
+        100% { transform: scale(1.6); opacity: 0; }
+      }
+      .animate-cast-TRAP { animation: cast-trap 0.7s ease-out forwards; z-index: 100 !important; position: relative; }
+
+      /* UTILITY: Spin + Blue */
+      @keyframes cast-utility {
+        0% { transform: scale(1) rotate(0); }
+        100% { transform: scale(0) rotate(360deg); opacity: 0; filter: drop-shadow(0 0 20px rgba(59, 130, 246, 0.8)); }
+      }
+      .animate-cast-UTILITY { animation: cast-utility 0.6s ease-in forwards; z-index: 100 !important; position: relative; }
+
+      /* DISCARD/MANIPULATION: Glitchy/Purple */
+      @keyframes cast-dark {
+        0% { transform: scale(1) skew(0); }
+        20% { transform: scale(1.1) skew(10deg); filter: invert(0.2); }
+        40% { transform: scale(1.1) skew(-10deg); filter: invert(0.4) drop-shadow(0 0 15px rgba(168, 85, 247, 0.8)); }
+        100% { transform: scale(0) translateY(50px); opacity: 0; }
+      }
+      .animate-cast-DISCARD, .animate-cast-MANIPULATION { animation: cast-dark 0.7s linear forwards; z-index: 100 !important; position: relative; }
+
+      /* BURN CARD ANIMATION */
+      @keyframes burn-card {
+        0% { filter: brightness(1) sepia(0); opacity: 1; transform: scale(1); }
+        30% { filter: brightness(2) sepia(1) hue-rotate(-20deg) saturate(5); transform: scale(1.1); }
+        100% { filter: brightness(0) grayscale(1); opacity: 0; transform: scale(0.8) translateY(20px); }
+      }
+      .animate-burn { animation: burn-card 0.7s ease-in forwards; pointer-events: none; }
+
+
+      @keyframes slam {
+        0% { transform: scale(10); opacity: 0; }
+        40% { transform: scale(1); opacity: 1; }
+        50% { transform: scale(1.1); }
+        60% { transform: scale(1); }
+        100% { transform: scale(1); opacity: 1; }
+      }
+      .animate-slam { animation: slam 0.8s cubic-bezier(0.25, 0.46, 0.45, 0.94) both; }
+      
+      @keyframes slow-fade-in {
+        0% { opacity: 0; }
+        100% { opacity: 1; }
+      }
+      .animate-slow-fade { animation: slow-fade-in 2s ease-out forwards; }
+      
+      @keyframes bg-darken {
+        0% { background-color: rgba(0,0,0,0); backdrop-filter: blur(0px); }
+        100% { background-color: rgba(0,0,0,0.85); backdrop-filter: blur(8px); }
+      }
+      .animate-bg-darken { animation: bg-darken 1.5s ease-out forwards; }
+    </style>
+  <script type="importmap">
+{
+  "imports": {
+    "lucide-react": "https://aistudiocdn.com/lucide-react@^0.555.0",
+    "react-dom/": "https://aistudiocdn.com/react-dom@^19.2.0/",
+    "react/": "https://aistudiocdn.com/react@^19.2.0/",
+    "react": "https://aistudiocdn.com/react@^19.2.0",
+    "ws": "https://aistudiocdn.com/ws@^8.18.3"
+  }
+}
+</script>
+</head>
+  <body>
+    <div id="root"></div>
+    <script type="module" src="/index.tsx"></script>
+  </body>
+</html>
