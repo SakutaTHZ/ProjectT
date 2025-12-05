@@ -21,6 +21,7 @@ import PlayerHUD from './components/game/PlayerHUD';
 const deepClone = <T,>(obj: T): T => JSON.parse(JSON.stringify(obj));
 
 const MAX_HAND_SIZE = 10;
+const DRAW_PER_TURN = 2; // Updated Rule: Draw 2 cards per turn
 
 const App: React.FC = () => {
   // --- Game State ---
@@ -46,6 +47,9 @@ const App: React.FC = () => {
   const [castingSlot, setCastingSlot] = useState<{playerId: string, slotIndex: number} | null>(null);
   const [burningSlotIndex, setBurningSlotIndex] = useState<number | null>(null);
   const [isProcessing, setIsProcessing] = useState(false);
+
+  // New State for Eagle Eye Instant Spell
+  const [isOpponentHandRevealed, setIsOpponentHandRevealed] = useState(false);
 
   const [player, setPlayer] = useState<PlayerState>({
     id: 'player',
@@ -283,6 +287,7 @@ const App: React.FC = () => {
       setCastingSlot(null);
       setBurningSlotIndex(null);
       setIsProcessing(false);
+      setIsOpponentHandRevealed(false);
   };
 
   const setupBoardState = (customDeck?: Card[], customCharacters?: Character[]) => {
@@ -500,17 +505,20 @@ const App: React.FC = () => {
       }
       else if (payload.actionType === 'CAST_SPELL') {
           const { card, targetId, slotIndex, effectTargetSlotIndex } = payload.data;
-          if (card && targetId !== undefined && slotIndex !== undefined) {
-             executeSpell(opponentRef.current, setOpponent, playerRef.current, setPlayer, card, targetId, slotIndex, effectTargetSlotIndex);
+          if (card) {
+             // If slotIndex is -1 or undefined, it's an instant or hand cast
+             executeSpell(opponentRef.current, setOpponent, playerRef.current, setPlayer, card, targetId || '', slotIndex ?? -1, effectTargetSlotIndex);
           }
       }
       else if (payload.actionType === 'END_TURN') {
           addLog("Opponent ended turn.", 'opponent');
+          setIsOpponentHandRevealed(false); // Reset Eagle Eye effect on turn end
           setOpponent(prev => ({ ...prev, disabledSlots: [] }));
           
           // Start Player Turn
           setPlayer(prev => {
-             const p = drawCard(prev, 1);
+             // UPDATE: Draw 2 Cards
+             const p = drawCard(prev, DRAW_PER_TURN);
              const processedP = processTurnStart(p);
              
              // CHECK IF I DIED FROM DOTS at start of my turn
@@ -672,9 +680,31 @@ const App: React.FC = () => {
       if (isProcessing || phase !== GamePhase.MAIN_PHASE || !player.isTurn) return;
       const cardId = e.dataTransfer.getData("cardId");
       const card = player.hand.find(c => c.id === cardId);
-      if (card) placeCardInSlot(card, slotIndex);
+      if (card) {
+          if (card.type === CardType.INSTANT) {
+              addLog("Instant spells cannot be placed in slots!", "system");
+          } else {
+              placeCardInSlot(card, slotIndex);
+          }
+      }
   };
-  const handleHandCardClick = (card: Card) => { if (phase === GamePhase.MAIN_PHASE && player.isTurn) placeCardInSlot(card); };
+  
+  // Update handleHandCardClick to support Instant Spells
+  const handleHandCardClick = (card: Card) => { 
+      if (phase !== GamePhase.MAIN_PHASE || !player.isTurn || isProcessing) return;
+      
+      if (card.type === CardType.INSTANT) {
+          const cost = getEffectiveCost(card, player);
+          if (player.soulPoints < cost) {
+              addLog("Not enough Soul Points!", 'system');
+              return;
+          }
+          // Instant spells are executed directly from hand
+          handleSpellExecution(player, setPlayer, opponent, setOpponent, card, '', -1); 
+      } else {
+          placeCardInSlot(card); 
+      }
+  };
 
   const handleSlotCardClick = (slotIndex: number) => {
     if (isProcessing || phase !== GamePhase.MAIN_PHASE || !player.isTurn) return;
@@ -687,7 +717,7 @@ const App: React.FC = () => {
     if (player.soulPoints < cost) { addLog("Not enough Soul Points!", 'system'); return; }
     
     // Auto-target spells
-    if (["Soul Harvest", "Soul Infusion", "Greed", "Focus", "Preparation", "Clairvoyance"].includes(card.name)) { 
+    if (["Soul Harvest", "Soul Infusion", "Greed", "Focus", "Preparation", "Clairvoyance", "Spell Shatter", "Equalizing Flow", "Rapid Reflex", "Unstable Rift", "Eagle Eye"].includes(card.name)) { 
         handleSpellExecution(player, setPlayer, player, setPlayer, card, player.id, slotIndex); 
         return; 
     }
@@ -727,7 +757,7 @@ const App: React.FC = () => {
 
       if (card.type === CardType.ATTACK && !isEnemy) return false;
       if (card.type === CardType.HEAL && isEnemy) return false;
-      if (card.type === CardType.DISCARD || card.type === CardType.MANIPULATION) return false; 
+      if (card.type === CardType.DISCARD || card.type === CardType.MANIPULATION || card.type === CardType.INSTANT) return false; 
       if (card.type === CardType.ATTACK && char.position !== 0 && !card.canTargetBackline) return false;
       return true;
   };
@@ -786,7 +816,12 @@ const App: React.FC = () => {
   ) => {
     if (isProcessing) return;
     setIsProcessing(true);
-    setCastingSlot({ playerId: caster.id, slotIndex });
+    
+    // If slotIndex is >= 0, it comes from a slot. If -1, it's an Instant from hand.
+    if (slotIndex >= 0) {
+        setCastingSlot({ playerId: caster.id, slotIndex });
+    }
+    
     addLog(`${caster.name} cast ${card.name}!`, caster.id === 'player' ? 'player' : 'opponent');
 
     setTimeout(() => {
@@ -808,8 +843,60 @@ const App: React.FC = () => {
         let newTargetDiscard = [...targeter.discard];
         let newTargetDisabledSlots = [...targeter.disabledSlots];
         let newTargetSoulPoints = targeter.soulPoints;
-        
-        if (card.type === CardType.DISCARD) {
+        let newTargetSlots = [...targeter.slots]; // For Spell Shatter
+
+        // -- INSTANT SPELL LOGIC --
+        if (card.type === CardType.INSTANT) {
+            // New Spells Logic
+            if (card.name === "Spell Shatter") {
+                // Destroy 2 opponent's spells
+                let occupiedIndices = newTargetSlots.map((s, i) => s ? i : -1).filter(i => i !== -1);
+                if (occupiedIndices.length > 0) {
+                    // Pick up to 2 random
+                    const toDestroy: number[] = [];
+                    for(let i=0; i<2; i++) {
+                         if (occupiedIndices.length === 0) break;
+                         const randIdx = Math.floor(Math.random() * occupiedIndices.length);
+                         toDestroy.push(occupiedIndices[randIdx]);
+                         occupiedIndices.splice(randIdx, 1);
+                    }
+                    toDestroy.forEach(idx => {
+                        newTargetSlots[idx] = null;
+                    });
+                }
+            } else if (card.name === "Equalizing Flow") {
+                // Combine soul points and split
+                const totalSp = caster.soulPoints + targeter.soulPoints - cost; // Pay cost first? Cost is paid below. 
+                // Wait, cost is paid from caster inside setCaster. 
+                // We should calculate total based on "Pre-Cost Caster SP - Cost + Target SP". 
+                // The caster state update happens later. Let's do calculation here.
+                const casterRemaining = caster.soulPoints - cost;
+                const combined = casterRemaining + targeter.soulPoints;
+                const split = Math.floor(combined / 2);
+                newTargetSoulPoints = split;
+                // Caster SP will be set in setCaster below to `split` (special handling needed)
+            } else if (card.name === "Rapid Reflex") {
+                // Draw 2 instantly
+                // Handled in setCaster logic as this is a self-buff utility
+            } else if (card.name === "Unstable Rift") {
+                // Discard both hands and draw 3
+                newTargetDiscard.push(...newTargetHand);
+                newTargetHand = [];
+                // Target Draws 3
+                // Need a way to simulate draw for opponent safely or reuse draw logic
+                // Since this is inside executeSpell, we have to manipulate the arrays manually or trigger helper
+                // Reusing generic logic:
+                // ...
+            } else if (card.name === "Eagle Eye") {
+                // Reveal opponent hand
+                if (caster.id === 'player') {
+                    setIsOpponentHandRevealed(true);
+                    setTimeout(() => setIsOpponentHandRevealed(false), 5000);
+                }
+                // If opponent uses it, visually we can't show "player hand" to them on this screen, but we can log it.
+            }
+
+        } else if (card.type === CardType.DISCARD) {
             if (newTargetHand.length > 0) {
                 const ridx = Math.floor(Math.random() * newTargetHand.length);
                 newTargetDiscard.push(newTargetHand.splice(ridx, 1)[0]);
@@ -824,6 +911,8 @@ const App: React.FC = () => {
                 }
             } else if (card.name === "Soul Drain") {
                  if (newTargetSoulPoints > 0) { newTargetSoulPoints -= 1; stolenSouls = 1; }
+            } else if (card.name === "Overload") {
+                 newTargetSoulPoints = Math.max(0, newTargetSoulPoints - 2);
             }
         } else if (card.type !== CardType.UTILITY) {
             newTargetBoard = newTargetBoard.map(char => {
@@ -871,35 +960,41 @@ const App: React.FC = () => {
         }
     
         const newScore = caster.score + killCount;
-        // WIN CONDITION: Score limit OR Entire enemy team dead
         const isTargetWipedOut = newTargetBoard.every(c => c.isDead);
         const isGameOver = newScore >= MAX_SCORE || isTargetWipedOut;
     
-        if (caster.id === targeter.id) {
-            // Self-cast (Heal/Utility)
-            setCaster(prev => {
-                 let newState = { ...prev };
-                 if (card.type !== CardType.UTILITY && card.type !== CardType.MANIPULATION) newState.board = newTargetBoard; 
-                 newState.soulPoints -= cost;
-                 const newSlots = [...newState.slots]; newSlots[slotIndex] = null; newState.slots = newSlots;
-                 newState.discard = [...newState.discard, card];
-                 // Utility Card Logic
-                 if (card.name === "Soul Harvest") newState = drawCard(newState, 2);
-                 if (card.name === "Greed") newState = drawCard(newState, 3);
-                 if (card.name === "Clairvoyance") newState = drawCard(newState, 1);
-                 if (card.name === "Focus") newState.soulPoints += 1;
-                 if (card.name === "Preparation" || card.name === "Soul Infusion") newState.soulPoints += 2;
-                 return newState;
-            });
-        } else {
-            // Offensive Cast
-            setTargeter(prev => ({ ...prev, board: newTargetBoard, hand: newTargetHand, discard: newTargetDiscard, disabledSlots: newTargetDisabledSlots, soulPoints: newTargetSoulPoints }));
-            setCaster(prev => {
-                let newState = { ...prev };
-                newState.soulPoints = newState.soulPoints - cost + stolenSouls;
-                const newSlots = [...newState.slots]; newSlots[slotIndex] = null; newState.slots = newSlots;
-                newState.discard = [...prev.discard, card];
-                newState.score = newScore;
+        // --- APPLY UPDATES TO CASTER ---
+        setCaster(prev => {
+             let newState = { ...prev };
+             // Handle Cost
+             if (card.name === "Equalizing Flow") {
+                  // Special Case: SP set to split amount (calculated from pre-cost values)
+                  const total = (prev.soulPoints - cost) + targeter.soulPoints;
+                  newState.soulPoints = Math.floor(total / 2);
+             } else {
+                  newState.soulPoints = newState.soulPoints - cost + stolenSouls;
+             }
+             
+             // Remove from Slot OR Hand (if Instant)
+             if (slotIndex >= 0) {
+                 const newSlots = [...newState.slots]; 
+                 newSlots[slotIndex] = null; 
+                 newState.slots = newSlots;
+             } else {
+                 // Removed from Hand (Instant)
+                 newState.hand = newState.hand.filter(c => c.id !== card.id);
+             }
+
+             // Add to discard
+             newState.discard = [...newState.discard, card];
+
+             // Self-Targeting or Board Updates if self-cast
+             if (caster.id === targeter.id) {
+                if (card.type !== CardType.UTILITY && card.type !== CardType.MANIPULATION && card.type !== CardType.INSTANT) {
+                    newState.board = newTargetBoard; 
+                }
+             } else {
+                // If Nyx passive or reflect damage, update board
                 if (casterIsNyx && card.type === CardType.ATTACK) {
                     const active = newState.board.find(c => c.position === 0);
                     if (active) { active.currentHealth = Math.min(active.maxHealth, active.currentHealth + 10); active.animationState = 'heal'; }
@@ -908,10 +1003,50 @@ const App: React.FC = () => {
                      const active = newState.board.find(c => c.position === 0);
                      if (active) { active.currentHealth = Math.max(0, active.currentHealth - reflectDamage); active.animationState = 'hit'; }
                 }
-                return newState;
+             }
+
+             // Utility/Instant Card Logic (Self Buffs)
+             if (card.name === "Soul Harvest" || card.name === "Rapid Reflex") newState = drawCard(newState, 2);
+             if (card.name === "Greed") newState = drawCard(newState, 3);
+             if (card.name === "Clairvoyance") newState = drawCard(newState, 1);
+             if (card.name === "Focus") newState.soulPoints += 1;
+             if (card.name === "Preparation" || card.name === "Soul Infusion") newState.soulPoints += 2;
+             
+             if (card.name === "Unstable Rift") {
+                 // Discard Hand & Draw 3
+                 newState.discard = [...newState.discard, ...newState.hand]; // Hand already filtered of played card above? Yes.
+                 newState.hand = [];
+                 newState = drawCard(newState, 3);
+             }
+             
+             newState.score = newScore;
+             return newState;
+        });
+
+        // --- APPLY UPDATES TO TARGETER ---
+        if (caster.id !== targeter.id) {
+            setTargeter(prev => {
+                let next = { 
+                    ...prev, 
+                    board: newTargetBoard, 
+                    hand: newTargetHand, 
+                    discard: newTargetDiscard, 
+                    disabledSlots: newTargetDisabledSlots, 
+                    soulPoints: newTargetSoulPoints,
+                    slots: newTargetSlots // For Spell Shatter
+                };
+                
+                if (card.name === "Unstable Rift") {
+                     // Target also discards hand and draws 3
+                     // Since we modified newTargetHand/Discard above, we assume newTargetHand was cleared? 
+                     // Wait, in the logic block above: newTargetDiscard.push(...newTargetHand); newTargetHand = [];
+                     // So we just need to execute the draw here.
+                     next = drawCard(next, 3);
+                }
+                return next;
             });
         }
-        
+
         setCastingSlot(null);
         setIsProcessing(false);
 
@@ -933,11 +1068,12 @@ const App: React.FC = () => {
     if (isProcessing) return;
     setSelectedCardId(null);
     setPlayer(prev => ({ ...prev, isTurn: false, diceRolled: false, disabledSlots: [] }));
+    setIsOpponentHandRevealed(false); // Reset on turn end
     
     // Process Opponent DOTs and Statuses at start of their turn
-    // Also, visually give opponent a card to simulate their draw phase
     setOpponent(prev => {
-        const nextState = drawCard(prev, 1);
+        // UPDATE: Draw 2 Cards
+        const nextState = drawCard(prev, DRAW_PER_TURN);
         return processTurnStart(nextState);
     });
 
@@ -962,7 +1098,8 @@ const App: React.FC = () => {
 
         await new Promise(r => setTimeout(r, 1000));
         if (checkGameOver()) return;
-        setOpponent(prev => drawCard(prev, 1));
+        // AI Draws 2
+        setOpponent(prev => drawCard(prev, DRAW_PER_TURN));
         
         await new Promise(r => setTimeout(r, 1000));
         if (checkGameOver()) return;
@@ -989,7 +1126,21 @@ const App: React.FC = () => {
         if (checkGameOver()) return;
         
         const currentOpp = opponentRef.current;
-        const playableSlots = currentOpp.slots.map((s, i) => ({ s, i })).filter(item => item.s && item.s.isReady && item.s.card.cost <= currentOpp.soulPoints && !currentOpp.disabledSlots.includes(item.i));
+        
+        // AI Logic for Instants (Basic implementation: AI checks hand for Instants and casts if beneficial)
+        const instants = currentOpp.hand.filter(c => c.type === CardType.INSTANT && c.cost <= currentOpp.soulPoints);
+        if (instants.length > 0 && Math.random() > 0.5) {
+             const instantCard = instants[0];
+             // Simple AI casting
+             await new Promise(r => {
+                 executeSpell(currentOpp, setOpponent, playerRef.current, setPlayer, instantCard, '', -1);
+                 setTimeout(r, 1000);
+             });
+        }
+        
+        // Re-fetch state after potential instant cast
+        const updatedOpp = opponentRef.current;
+        const playableSlots = updatedOpp.slots.map((s, i) => ({ s, i })).filter(item => item.s && item.s.isReady && item.s.card.cost <= updatedOpp.soulPoints && !updatedOpp.disabledSlots.includes(item.i));
 
         if (playableSlots.length > 0) {
             const pick = playableSlots[Math.floor(Math.random() * playableSlots.length)];
@@ -1003,14 +1154,14 @@ const App: React.FC = () => {
                     tid = card.canTargetBackline ? living[Math.floor(Math.random() * living.length)].id : playerRef.current.board.find(c => c.position === 0 && !c.isDead)?.id;
                 }
             } else if (card.type === CardType.HEAL) {
-                tid = currentOpp.board.find(c => c.currentHealth < c.maxHealth && !c.isDead)?.id;
+                tid = updatedOpp.board.find(c => c.currentHealth < c.maxHealth && !c.isDead)?.id;
             } else if (card.type === CardType.DISCARD || card.type === CardType.MANIPULATION) {
                 tid = playerRef.current.id;
             }
 
             if (tid) {
                 await new Promise(r => {
-                     executeSpell(currentOpp, setOpponent, playerRef.current, setPlayer, card, tid!, slotIndex);
+                     executeSpell(updatedOpp, setOpponent, playerRef.current, setPlayer, card, tid!, slotIndex);
                      setTimeout(r, 1000); // Wait for spell animation to finish
                 });
             }
@@ -1024,7 +1175,14 @@ const App: React.FC = () => {
             const newHand = [...prev.hand];
             for (let i = 0; i < newSlots.length; i++) {
                 if (prev.disabledSlots.includes(i)) continue;
-                if (newSlots[i] === null && newHand.length > 0) newSlots[i] = { instanceId: newHand[0].id, card: newHand.shift()!, isReady: false };
+                if (newSlots[i] === null && newHand.length > 0) {
+                     // AI prefers not putting Instants in slots (though game rules prevent it for players, we ensure AI follows too)
+                     const candidateIdx = newHand.findIndex(c => c.type !== CardType.INSTANT);
+                     if (candidateIdx >= 0) {
+                         newSlots[i] = { instanceId: newHand[candidateIdx].id, card: newHand[candidateIdx], isReady: false };
+                         newHand.splice(candidateIdx, 1);
+                     }
+                }
             }
             return { ...prev, slots: newSlots, hand: newHand };
         });
@@ -1036,7 +1194,8 @@ const App: React.FC = () => {
         
         // Process Player DOTs at start of player turn
         setPlayer(prev => {
-             const p = drawCard(prev, 1);
+             // UPDATE: Draw 2
+             const p = drawCard(prev, DRAW_PER_TURN);
              const processedP = processTurnStart(p);
              return { ...processedP, isTurn: true, diceRolled: false };
         });
@@ -1089,6 +1248,7 @@ const App: React.FC = () => {
             onToggleLog={() => setShowLog(!showLog)} showLog={showLog} onOpenSettings={() => setShowSettings(true)}
             onPlayerTargetClick={handlePlayerTargetClick} onOpponentSlotClick={handleOpponentSlotClick}
             onCharacterClick={handleTargetClick} isValidTarget={isCharacterValidTarget} onInspectCard={(c) => setInspectedItem(c)}
+            isOpponentHandRevealed={isOpponentHandRevealed}
           />
       </div>
 

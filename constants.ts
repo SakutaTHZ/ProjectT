@@ -335,6 +335,53 @@ export const CARDS_DB: Card[] = [
     type: CardType.MANIPULATION,
     description: 'Opponent loses 2 Soul Points.',
     image: 'https://picsum.photos/200/300?random=36'
+  },
+
+  // --- INSTANT ---
+  {
+    id: 'inst-1',
+    name: 'Spell Shatter',
+    cost: 2,
+    damage: 0,
+    type: CardType.INSTANT,
+    description: 'Destroy 2 random opponent spells in slots.',
+    image: 'https://picsum.photos/200/300?random=60'
+  },
+  {
+    id: 'inst-2',
+    name: 'Equalizing Flow',
+    cost: 3,
+    damage: 0,
+    type: CardType.INSTANT,
+    description: 'Combine both players\' Soul Points and split equally.',
+    image: 'https://picsum.photos/200/300?random=61'
+  },
+  {
+    id: 'inst-3',
+    name: 'Rapid Reflex',
+    cost: 1,
+    damage: 0,
+    type: CardType.INSTANT,
+    description: 'Draw 2 cards instantly.',
+    image: 'https://picsum.photos/200/300?random=62'
+  },
+  {
+    id: 'inst-4',
+    name: 'Unstable Rift',
+    cost: 4,
+    damage: 0,
+    type: CardType.INSTANT,
+    description: 'Both players discard hand and draw 3 cards.',
+    image: 'https://picsum.photos/200/300?random=63'
+  },
+  {
+    id: 'inst-5',
+    name: 'Eagle Eye',
+    cost: 1,
+    damage: 0,
+    type: CardType.INSTANT,
+    description: 'Reveal opponent\'s hand for 5 seconds.',
+    image: 'https://picsum.photos/200/300?random=64'
   }
 ];
 

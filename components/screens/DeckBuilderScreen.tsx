@@ -3,7 +3,7 @@ import React, { useState, useEffect } from 'react';
 import { Card, CardType, Character } from '../../types';
 import { CARDS_DB, CHARACTERS_DB } from '../../constants';
 import CardComponent from '../CardComponent';
-import { ArrowLeft, Play, Sparkles, Trash2, Plus, AlertCircle, Users, Layers, Save } from 'lucide-react';
+import { ArrowLeft, Play, Sparkles, Trash2, Plus, AlertCircle, Users, Layers, Save, Info } from 'lucide-react';
 
 interface Props {
   onBack: () => void;
@@ -17,6 +17,7 @@ type BuildTab = 'SQUAD' | 'DECK';
 
 const DeckBuilderScreen: React.FC<Props> = ({ onBack, onStartGame }) => {
   const [activeTab, setActiveTab] = useState<BuildTab>('SQUAD');
+  const [notification, setNotification] = useState<string | null>(null);
   
   // Deck State
   const [currentDeck, setCurrentDeck] = useState<Card[]>([]);
@@ -45,12 +46,16 @@ const DeckBuilderScreen: React.FC<Props> = ({ onBack, onStartGame }) => {
     }
   }, []);
 
+  const showNotification = (msg: string) => {
+      setNotification(msg);
+      setTimeout(() => setNotification(null), 3000);
+  };
+
   // --- Actions ---
 
   const saveLoadout = () => {
       localStorage.setItem('soul_rotation_deck', JSON.stringify(currentDeck));
       localStorage.setItem('soul_rotation_squad', JSON.stringify(selectedCharacters));
-      // Visual feedback could be added here, for now a simple console log or button animation state
       const btn = document.getElementById('save-btn');
       if(btn) {
           const originalText = btn.innerHTML;
@@ -60,7 +65,26 @@ const DeckBuilderScreen: React.FC<Props> = ({ onBack, onStartGame }) => {
   };
 
   const addToDeck = (card: Card) => {
-    if (currentDeck.length >= DECK_SIZE_LIMIT) return;
+    if (currentDeck.length >= DECK_SIZE_LIMIT) {
+        showNotification("Deck Full! Remove cards to add more.");
+        return;
+    }
+    
+    // Check Limits
+    const copiesInDeck = currentDeck.filter(c => c.name === card.name).length;
+    
+    // Rule 1: Instant spells max 1 copy
+    if (card.type === CardType.INSTANT && copiesInDeck >= 1) {
+        showNotification("Only 1 copy of an Instant Spell allowed!");
+        return;
+    }
+
+    // Rule 2: Max 3 copies of any other card
+    if (copiesInDeck >= 3) {
+        showNotification("Max 3 copies of any card allowed!");
+        return;
+    }
+
     const deckCard = { ...card, id: `deck-${Math.random().toString(36).substr(2, 9)}` };
     setCurrentDeck(prev => [...prev, deckCard]);
   };
@@ -93,29 +117,22 @@ const DeckBuilderScreen: React.FC<Props> = ({ onBack, onStartGame }) => {
     }
 
     // Auto Build Deck
-    const newDeck: Card[] = [...currentDeck];
-    if (newDeck.length < DECK_SIZE_LIMIT) {
-        const targetCounts = {
-            [CardType.ATTACK]: 12,
-            [CardType.HEAL]: 6,
-            [CardType.TRAP]: 4,
-            [CardType.UTILITY]: 4,
-            [CardType.MANIPULATION]: 2,
-            [CardType.DISCARD]: 2
-        };
-        const getRandomCard = (type: CardType) => {
-            const candidates = CARDS_DB.filter(c => c.type === type);
-            return candidates[Math.floor(Math.random() * candidates.length)];
-        };
+    let newDeck: Card[] = [...currentDeck];
+    
+    // Safety break loop
+    let attempts = 0;
+    while(newDeck.length < DECK_SIZE_LIMIT && attempts < 100) {
+        attempts++;
+        const randomCard = CARDS_DB[Math.floor(Math.random() * CARDS_DB.length)];
+        
+        // Check limits before adding
+        const copies = newDeck.filter(c => c.name === randomCard.name).length;
+        if (randomCard.type === CardType.INSTANT && copies >= 1) continue;
+        if (copies >= 3) continue;
 
-        const neededTotal = DECK_SIZE_LIMIT - newDeck.length;
-        // Simple fill for now
-        for(let i=0; i<neededTotal; i++) {
-             const randomCard = CARDS_DB[Math.floor(Math.random() * CARDS_DB.length)];
-             newDeck.push({ ...randomCard, id: `deck-${Math.random().toString(36).substr(2, 9)}` });
-        }
-        setCurrentDeck(newDeck);
+        newDeck.push({ ...randomCard, id: `deck-${Math.random().toString(36).substr(2, 9)}` });
     }
+    setCurrentDeck(newDeck);
   };
 
   const clearAll = () => {
@@ -141,6 +158,14 @@ const DeckBuilderScreen: React.FC<Props> = ({ onBack, onStartGame }) => {
     <div className="w-full h-screen bg-black text-amber-100 flex flex-col overflow-hidden relative">
        <div className="absolute inset-0 bg-[radial-gradient(ellipse_at_top,_var(--tw-gradient-stops))] from-neutral-900 via-black to-black -z-10"></div>
        <div className="absolute inset-0 opacity-20 bg-[url('https://www.transparenttextures.com/patterns/dark-matter.png')] -z-10"></div>
+
+       {/* Notification Overlay */}
+       {notification && (
+           <div className="absolute top-24 left-1/2 -translate-x-1/2 z-50 bg-red-900/90 text-white px-6 py-3 rounded-full border border-red-500 shadow-xl flex items-center gap-2 animate-in fade-in zoom-in duration-200">
+               <AlertCircle size={20} />
+               <span className="font-bold">{notification}</span>
+           </div>
+       )}
 
        {/* Header */}
        <div className="h-20 border-b border-yellow-900/30 bg-neutral-900/50 backdrop-blur-md flex items-center justify-between px-8 z-20">
@@ -213,29 +238,43 @@ const DeckBuilderScreen: React.FC<Props> = ({ onBack, onStartGame }) => {
                     </div>
                     <div className="flex-1 overflow-y-auto p-6 custom-scrollbar bg-[url('https://www.transparenttextures.com/patterns/carbon-fibre.png')]">
                         <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-6">
-                        {filteredLibrary.map((card) => (
-                            <div key={card.id} className="group relative">
-                                <div className="transform transition-all duration-300 group-hover:scale-105 group-hover:z-10 group-hover:shadow-xl">
-                                    <CardComponent 
-                                        card={card} 
-                                        className="w-full aspect-[5/7] shadow-lg" 
-                                        disableHover
-                                    />
-                                    <div className="absolute inset-0 bg-black/60 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center rounded-xl">
-                                        <button 
-                                            onClick={() => addToDeck(card)}
-                                            disabled={currentDeck.length >= DECK_SIZE_LIMIT}
-                                            className="bg-yellow-600 text-black p-3 rounded-full hover:scale-110 transition-transform shadow-[0_0_15px_rgba(234,179,8,0.6)] disabled:bg-neutral-700 disabled:text-neutral-500"
-                                        >
-                                            <Plus size={24} />
-                                        </button>
+                        {filteredLibrary.map((card) => {
+                             const count = currentDeck.filter(c => c.name === card.name).length;
+                             const isInstant = card.type === CardType.INSTANT;
+                             const isMaxed = isInstant ? count >= 1 : count >= 3;
+
+                             return (
+                                <div key={card.id} className={`group relative ${isMaxed ? 'opacity-50 grayscale' : ''}`}>
+                                    <div className="transform transition-all duration-300 group-hover:scale-105 group-hover:z-10 group-hover:shadow-xl">
+                                        <CardComponent 
+                                            card={card} 
+                                            className="w-full aspect-[5/7] shadow-lg" 
+                                            disableHover
+                                        />
+                                        {!isMaxed && (
+                                            <div className="absolute inset-0 bg-black/60 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center rounded-xl">
+                                                <button 
+                                                    onClick={() => addToDeck(card)}
+                                                    disabled={currentDeck.length >= DECK_SIZE_LIMIT}
+                                                    className="bg-yellow-600 text-black p-3 rounded-full hover:scale-110 transition-transform shadow-[0_0_15px_rgba(234,179,8,0.6)] disabled:bg-neutral-700 disabled:text-neutral-500"
+                                                >
+                                                    <Plus size={24} />
+                                                </button>
+                                            </div>
+                                        )}
+                                        {isMaxed && (
+                                            <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
+                                                <span className="bg-red-900/80 text-white px-2 py-1 text-xs font-bold rounded border border-red-500">MAX</span>
+                                            </div>
+                                        )}
+                                    </div>
+                                    <div className="flex justify-between mt-2 text-xs font-bold text-neutral-500 group-hover:text-yellow-500 transition-colors uppercase tracking-wider px-1">
+                                        <span>Cost {card.cost}</span>
+                                        <span className={count > 0 ? 'text-yellow-500' : ''}>{count}/{isInstant ? '1' : '3'}</span>
                                     </div>
                                 </div>
-                                <div className="text-center mt-2 text-xs font-bold text-neutral-500 group-hover:text-yellow-500 transition-colors uppercase tracking-wider">
-                                    Cost {card.cost}
-                                </div>
-                            </div>
-                        ))}
+                             );
+                        })}
                         </div>
                     </div>
                  </>
@@ -314,6 +353,12 @@ const DeckBuilderScreen: React.FC<Props> = ({ onBack, onStartGame }) => {
 
                   {activeTab === 'DECK' && (
                       <div className="space-y-2">
+                          {activeTab === 'DECK' && currentDeck.length > 0 && (
+                             <div className="flex justify-between items-center text-xs text-neutral-500 px-2 pb-2 mb-2 border-b border-neutral-800">
+                                 <span>Rules: Max 3 copies, Max 1 Instant</span>
+                                 <Info size={12} />
+                             </div>
+                          )}
                           {sortedDeck.map((card, index) => (
                              <div 
                                 key={card.id + index} 
@@ -322,7 +367,10 @@ const DeckBuilderScreen: React.FC<Props> = ({ onBack, onStartGame }) => {
                              >
                                 <div className="w-8 h-8 flex items-center justify-center bg-neutral-950 border border-neutral-700 rounded font-fantasy text-yellow-600 font-bold">{card.cost}</div>
                                 <div className="flex-1">
-                                    <div className="text-sm font-bold text-neutral-300 group-hover:text-red-400 transition-colors">{card.name}</div>
+                                    <div className="text-sm font-bold text-neutral-300 group-hover:text-red-400 transition-colors flex items-center gap-2">
+                                        {card.name} 
+                                        {card.type === CardType.INSTANT && <span className="text-[9px] bg-white text-black px-1 rounded font-bold">INSTANT</span>}
+                                    </div>
                                     <div className="text-[10px] text-neutral-600 uppercase tracking-wider">{card.type}</div>
                                 </div>
                                 <div className="opacity-0 group-hover:opacity-100 text-red-500 transition-opacity"><Trash2 size={16} /></div>

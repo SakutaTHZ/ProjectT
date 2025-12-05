@@ -5,7 +5,8 @@ export enum CardType {
   TRAP = 'TRAP',
   UTILITY = 'UTILITY',
   DISCARD = 'DISCARD',
-  MANIPULATION = 'MANIPULATION'
+  MANIPULATION = 'MANIPULATION',
+  INSTANT = 'INSTANT'
 }
 
 export enum StatusType {

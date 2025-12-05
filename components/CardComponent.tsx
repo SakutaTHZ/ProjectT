@@ -1,6 +1,6 @@
 import React, { useRef } from 'react';
 import { Card, CardType } from '../types';
-import { Flame, Heart, ShieldAlert, Zap, Hexagon, Clock, Skull, Lock } from 'lucide-react';
+import { Flame, Heart, ShieldAlert, Zap, Hexagon, Clock, Skull, Lock, Wind } from 'lucide-react';
 
 interface CardProps {
   card?: Card; // Optional if face down
@@ -145,6 +145,15 @@ const CardComponent: React.FC<CardProps> = ({
           iconColor: 'text-fuchsia-500',
           costBorder: 'border-fuchsia-500/60',
         };
+      case CardType.INSTANT:
+        return {
+          border: 'border-white/70',
+          shadow: 'shadow-[0_0_20px_rgba(255,255,255,0.3)]',
+          badgeBg: 'bg-neutral-200/90',
+          badgeText: 'text-neutral-900',
+          iconColor: 'text-white',
+          costBorder: 'border-white',
+        };
       default:
         return {
           border: 'border-neutral-500/60',
@@ -166,6 +175,7 @@ const CardComponent: React.FC<CardProps> = ({
       case CardType.TRAP: return <ShieldAlert size={16} className={colors.iconColor} />;
       case CardType.MANIPULATION: return <Lock size={16} className={colors.iconColor} />;
       case CardType.DISCARD: return <Skull size={16} className={colors.iconColor} />;
+      case CardType.INSTANT: return <Wind size={16} className={colors.iconColor} />;
       default: return <Zap size={16} className={colors.iconColor} />;
     }
   };

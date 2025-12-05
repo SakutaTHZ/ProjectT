@@ -3,7 +3,7 @@ import { PlayerState, CardType, Character, Card } from '../../types';
 import { MAX_SCORE } from '../../constants';
 import CardComponent from '../CardComponent';
 import CharacterTriangle from '../CharacterTriangle';
-import { ScrollText, Settings, Hexagon, Layers, Lock } from 'lucide-react';
+import { ScrollText, Settings, Hexagon, Layers, Lock, Eye } from 'lucide-react';
 
 interface Props {
   opponent: PlayerState;
@@ -19,6 +19,7 @@ interface Props {
   onCharacterClick: (char: Character, isEnemy: boolean) => void;
   isValidTarget: (char: Character, isEnemy: boolean) => boolean;
   onInspectCard: (card: Card | Character) => void;
+  isOpponentHandRevealed?: boolean; // New Prop
 }
 
 const TopBar: React.FC<Props> = ({ 
@@ -34,7 +35,8 @@ const TopBar: React.FC<Props> = ({
   onOpponentSlotClick,
   onCharacterClick,
   isValidTarget,
-  onInspectCard
+  onInspectCard,
+  isOpponentHandRevealed
 }) => {
   
   const isDiscardActive = selectedCardId && playerSlotWithCardId(selectedCardId)?.card.type === CardType.DISCARD;
@@ -165,9 +167,21 @@ const TopBar: React.FC<Props> = ({
 
             {/* Hand (Center) */}
             <div className="flex -space-x-8 md:-space-x-3 items-start justify-center pt-2">
-                {opponent.hand.map((_, i) => (
+                {isOpponentHandRevealed && (
+                    <div className="absolute -top-6 left-1/2 -translate-x-1/2 flex items-center gap-2 bg-white/10 px-3 py-1 rounded-full animate-pulse border border-white/20">
+                        <Eye size={16} className="text-white" />
+                        <span className="text-xs font-bold text-white uppercase tracking-widest">Hand Revealed</span>
+                    </div>
+                )}
+
+                {opponent.hand.map((card, i) => (
                     <div key={i} className="origin-top hover:translate-y-4 transition-transform duration-300 animate-draw-opponent scale-50 md:scale-90">
-                        <CardComponent isFaceDown className="w-16 md:w-20 aspect-[5/7]" />
+                        <CardComponent 
+                           card={card} 
+                           isFaceDown={!isOpponentHandRevealed} 
+                           className="w-16 md:w-20 aspect-[5/7]" 
+                           onClick={() => isOpponentHandRevealed && onInspectCard(card)}
+                        />
                     </div>
                 ))}
                 {opponent.hand.length === 0 && (
