@@ -11,6 +11,20 @@
         if (args[0] && typeof args[0] === 'string' && args[0].includes('cdn.tailwindcss.com')) return;
         originalWarn.apply(console, args);
       };
+      
+      // Error catcher for mobile debugging
+      window.onerror = function(msg, url, line, col, error) {
+        // If the app fails to load, this will eventually print a red error on screen
+        setTimeout(() => {
+           const root = document.getElementById('root');
+           if (root && root.innerHTML.trim() === '') {
+               const errDiv = document.createElement('div');
+               errDiv.style.cssText = 'position:fixed;top:0;left:0;width:100%;height:100%;background:black;color:red;padding:20px;z-index:9999;font-family:monospace;overflow:scroll;';
+               errDiv.innerHTML = '<h3>App Failed to Start</h3><p>' + msg + '</p><p>' + url + ':' + line + '</p>';
+               document.body.appendChild(errDiv);
+           }
+        }, 3000);
+      };
     </script>
     <script src="https://cdn.tailwindcss.com"></script>
     <script>
@@ -195,14 +209,14 @@
 <script type="importmap">
 {
   "imports": {
+    "react": "https://aistudiocdn.com/react@^19.2.1",
+    "react-dom/": "https://aistudiocdn.com/react-dom@^19.2.1/",
+    "react/": "https://aistudiocdn.com/react@^19.2.1/",
+    "lucide-react": "https://aistudiocdn.com/lucide-react@^0.556.0",
+    "ws": "https://aistudiocdn.com/ws@^8.18.3",
     "os": "https://aistudiocdn.com/os@^0.1.2",
     "vite": "https://aistudiocdn.com/vite@^7.2.6",
-    "@vitejs/plugin-react": "https://aistudiocdn.com/@vitejs/plugin-react@^5.1.1",
-    "react-dom/": "https://aistudiocdn.com/react-dom@^19.2.1/",
-    "lucide-react": "https://aistudiocdn.com/lucide-react@^0.556.0",
-    "react/": "https://aistudiocdn.com/react@^19.2.1/",
-    "react": "https://aistudiocdn.com/react@^19.2.1",
-    "ws": "https://aistudiocdn.com/ws@^8.18.3"
+    "@vitejs/plugin-react": "https://aistudiocdn.com/@vitejs/plugin-react@^5.1.1"
   }
 }
 </script>
