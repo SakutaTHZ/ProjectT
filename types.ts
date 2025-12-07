@@ -104,7 +104,7 @@ export interface SocketMessage {
 }
 
 export interface OnlineActionPayload {
-  actionType: 'CAST_SPELL' | 'END_TURN' | 'ROLL_DICE' | 'ROTATE' | 'BURN_CARD' | 'PLACE_CARD' | 'RESET_SLOTS' | 'BUY_CARD' | 'CONCEDE';
+  actionType: 'CAST_SPELL' | 'END_TURN' | 'ROLL_DICE' | 'ROTATE' | 'BURN_CARD' | 'PLACE_CARD' | 'RESET_SLOTS' | 'BUY_CARD' | 'CONCEDE' | 'GAME_OVER';
   data: {
       value?: number;
       card?: Card;
@@ -112,5 +112,6 @@ export interface OnlineActionPayload {
       slotIndex?: number;
       effectTargetSlotIndex?: number;
       currentSoulPoints?: number; // For synchronization
+      winnerId?: string;
   };
 }

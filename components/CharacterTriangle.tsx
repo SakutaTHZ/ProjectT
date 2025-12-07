@@ -1,7 +1,7 @@
 
 import React, { useRef } from 'react';
 import { Character, StatusType } from '../types';
-import { Shield, Skull, Zap, Flame, ShieldAlert, ZapOff, TrendingDown } from 'lucide-react';
+import { Shield, Skull, Zap, Flame, ShieldAlert, ZapOff, TrendingDown, XCircle } from 'lucide-react';
 
 interface Props {
   characters: Character[];
@@ -99,19 +99,25 @@ const CharacterTriangle: React.FC<Props> = ({ characters, isPlayer, onCharacterC
               className={`
                 relative w-24 aspect-[5/7] rounded-lg border-2 bg-neutral-900 shadow-2xl overflow-hidden
                 transition-all duration-300
-                ${char.isDead ? 'opacity-40 grayscale border-neutral-800' : 'border-neutral-700'}
+                ${char.isDead ? 'border-neutral-800 animate-shatter' : 'border-neutral-700'}
                 ${isTargetable ? 'cursor-pointer ring-4 ring-red-500 scale-110' : ''}
                 ${char.position === 0 ? 'scale-110 z-20 border-yellow-500 shadow-[0_0_20px_rgba(234,179,8,0.3)]' : 'z-10 scale-90 opacity-80 hover:scale-100 hover:ring-2 hover:ring-yellow-600'}
                 ${animationClass}
               `}
             >
               {char.isDead && (
-                 <div className="absolute inset-0 flex items-center justify-center bg-black/80 z-30">
-                   <Skull className="text-neutral-500 w-8 h-8" />
+                 <div className="absolute inset-0 flex flex-col items-center justify-center bg-black/80 z-30 backdrop-blur-sm">
+                   <div className="relative">
+                       <XCircle className="text-red-700 w-10 h-10 opacity-80" strokeWidth={1.5} />
+                       <Skull className="text-red-500 w-6 h-6 absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2" />
+                   </div>
+                   <span className="text-[10px] font-bold text-red-600 tracking-widest uppercase mt-1 drop-shadow-md">Shattered</span>
+                   {/* Crack effect overlay */}
+                   <div className="absolute inset-[-50px] bg-[url('https://www.transparenttextures.com/patterns/cracked-concrete.png')] opacity-40 mix-blend-overlay"></div>
                  </div>
               )}
               
-              <img src={char.image} alt={char.name} className="w-full h-full object-cover" />
+              <img src={char.image} alt={char.name} className={`w-full h-full object-cover transition-all ${char.isDead ? 'grayscale blur-sm' : ''}`} />
               
               {/* Status Effects Row */}
               {char.statuses.length > 0 && !char.isDead && (
@@ -126,19 +132,23 @@ const CharacterTriangle: React.FC<Props> = ({ characters, isPlayer, onCharacterC
               )}
 
               {/* Health Bar Overlay */}
-              <div className="absolute bottom-0 left-0 w-full h-6 bg-black/80 backdrop-blur-sm flex items-center px-1 border-t border-neutral-800">
-                 <div className="w-full h-1.5 bg-neutral-700 rounded-full overflow-hidden">
-                   <div 
-                      className={`h-full ${isPlayer ? 'bg-emerald-500' : 'bg-red-500'}`} 
-                      style={{ width: `${(char.currentHealth / char.maxHealth) * 100}%` }}
-                   ></div>
-                 </div>
-              </div>
+              {!char.isDead && (
+                <div className="absolute bottom-0 left-0 w-full h-6 bg-black/80 backdrop-blur-sm flex items-center px-1 border-t border-neutral-800">
+                   <div className="w-full h-1.5 bg-neutral-700 rounded-full overflow-hidden">
+                     <div 
+                        className={`h-full ${isPlayer ? 'bg-emerald-500' : 'bg-red-500'}`} 
+                        style={{ width: `${(char.currentHealth / char.maxHealth) * 100}%` }}
+                     ></div>
+                   </div>
+                </div>
+              )}
               
               {/* Health Text */}
-              <div className="absolute top-1 right-1 bg-black/70 px-1.5 rounded text-[10px] font-bold text-white border border-neutral-700">
-                {char.currentHealth}
-              </div>
+              {!char.isDead && (
+                <div className="absolute top-1 right-1 bg-black/70 px-1.5 rounded text-[10px] font-bold text-white border border-neutral-700">
+                  {char.currentHealth}
+                </div>
+              )}
               
               {/* Active Indicator (Gold) */}
               {char.position === 0 && !char.isDead && (

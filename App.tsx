@@ -503,11 +503,27 @@ const App: React.FC = () => {
            addLog("Opponent Surrendered!", 'system');
            socketService.disconnect();
       }
+      else if (payload.actionType === 'GAME_OVER') {
+           // Opponent broadcasted Game Over (which implies I won, or they won?)
+           // If opponent sends GAME_OVER with their ID as winner, I lost.
+           if (payload.data.winnerId === opponentRef.current.id) {
+               setPhase(GamePhase.GAME_OVER);
+               setOpponent(prev => ({...prev, score: MAX_SCORE}));
+               addLog("DEFEAT! Your party has fallen.", 'system');
+           }
+      }
       else if (payload.actionType === 'CAST_SPELL') {
-          const { card, targetId, slotIndex, effectTargetSlotIndex } = payload.data;
+          const { card, targetId, slotIndex, effectTargetSlotIndex, currentSoulPoints } = payload.data;
           if (card) {
              // If slotIndex is -1 or undefined, it's an instant or hand cast
              executeSpell(opponentRef.current, setOpponent, playerRef.current, setPlayer, card, targetId || '', slotIndex ?? -1, effectTargetSlotIndex);
+             
+             // Force Sync Opponent Soul Points AFTER the spell executes to correct drift
+             if (currentSoulPoints !== undefined) {
+                 setTimeout(() => {
+                     setOpponent(prev => ({ ...prev, soulPoints: currentSoulPoints }));
+                 }, 800); // Wait for spell anims
+             }
           }
       }
       else if (payload.actionType === 'END_TURN') {
@@ -529,6 +545,12 @@ const App: React.FC = () => {
                      // I lost, so Opponent (who just ended turn) wins.
                      setOpponent(o => ({...o, score: MAX_SCORE}));
                      addLog("DEFEAT! Your party has fallen.", 'system');
+                     
+                     // Broadcast Game Over to Opponent
+                     if(gameMode === GameMode.ONLINE) {
+                          socketService.sendAction({ actionType: 'GAME_OVER', data: { winnerId: opponentRef.current.id } });
+                     }
+
                  }, 500);
              }
 
@@ -802,9 +824,20 @@ const App: React.FC = () => {
 
       // If online and I am casting, tell the opponent
       if (gameMode === GameMode.ONLINE && caster.id === 'player') {
+          // Calculate expected SP after cast to sync with opponent
+          const cost = getEffectiveCost(card, caster);
+          let nextSP = caster.soulPoints - cost;
+          if (card.name === "Equalizing Flow") {
+              const total = (caster.soulPoints - cost) + targeter.soulPoints;
+              nextSP = Math.floor(total / 2);
+          } else if (card.name === "Soul Drain") {
+              nextSP += 1; // Assuming stealing 1
+          } else if (card.name === "Focus") nextSP += 1;
+          else if (card.name === "Preparation" || card.name === "Soul Infusion") nextSP += 2;
+          
           socketService.sendAction({ 
               actionType: 'CAST_SPELL', 
-              data: { card, targetId, slotIndex, effectTargetSlotIndex } 
+              data: { card, targetId, slotIndex, effectTargetSlotIndex, currentSoulPoints: nextSP } 
           });
       }
   };
@@ -1060,6 +1093,11 @@ const App: React.FC = () => {
         if (isGameOver) {
             setPhase(GamePhase.GAME_OVER);
             addLog(caster.id === 'player' ? "VICTORY!" : "DEFEAT!", 'system');
+            
+            // Broadcast Game Over if online and I am the winner (or caster causing the end)
+            if (gameMode === GameMode.ONLINE && caster.id === 'player') {
+                 socketService.sendAction({ actionType: 'GAME_OVER', data: { winnerId: caster.id } });
+            }
         }
     }, 700);
   };
