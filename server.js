@@ -9,7 +9,8 @@
 
 import { WebSocketServer, WebSocket } from 'ws';
 
-const wss = new WebSocketServer({ port: 8080 });
+// host: '0.0.0.0' ensures we listen on all network interfaces, not just localhost
+const wss = new WebSocketServer({ host: '0.0.0.0', port: 8080 });
 
 // Store clients by room: { [roomId]: Set<WebSocket> }
 const rooms = {};

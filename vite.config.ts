@@ -1,23 +1,15 @@
-import path from 'path';
-import { defineConfig, loadEnv } from 'vite';
+import { defineConfig } from 'vite';
 import react from '@vitejs/plugin-react';
 
-export default defineConfig(({ mode }) => {
-    const env = loadEnv(mode, '.', '');
-    return {
-      server: {
-        port: 3000,
-        host: '0.0.0.0',
-      },
-      plugins: [react()],
-      define: {
-        'process.env.API_KEY': JSON.stringify(env.GEMINI_API_KEY),
-        'process.env.GEMINI_API_KEY': JSON.stringify(env.GEMINI_API_KEY)
-      },
-      resolve: {
-        alias: {
-          '@': path.resolve(__dirname, '.'),
-        }
-      }
-    };
+export default defineConfig({
+  plugins: [react()],
+  server: {
+    host: '0.0.0.0', // Explicitly listen on all network interfaces
+    port: 3000,
+    strictPort: true, // Prevents switching ports if 3000 is busy
+    cors: true, // Allow CORS
+    hmr: {
+      clientPort: 3000 // Ensures the mobile device connects back to the right port for HMR
+    }
+  }
 });
