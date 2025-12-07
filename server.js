@@ -15,27 +15,41 @@ const wss = new WebSocketServer({ host: '0.0.0.0', port: 8080 });
 // Store clients by room: { [roomId]: Set<WebSocket> }
 const rooms = {};
 
-// Helper to find the LAN IP address
-const getLocalIp = () => {
+// Helper to find ALL LAN IP addresses
+const getLocalIps = () => {
   const nets = networkInterfaces();
+  const results = [];
+
   for (const name of Object.keys(nets)) {
     for (const net of nets[name]) {
       // Skip internal (localhost) and non-IPv4
       if (net.family === 'IPv4' && !net.internal) {
-        return net.address;
+        results.push({ name, address: net.address });
       }
     }
   }
-  return 'localhost';
+  return results;
 };
 
-const ip = getLocalIp();
+const ips = getLocalIps();
 
 console.log('\n==================================================');
 console.log('SOUL ROTATION GAME SERVER RUNNING');
 console.log(`Listening on port: 8080`);
-console.log(`LAN Access (WebSocket): ws://${ip}:8080`);
-console.log(`LAN Access (Vite App):  http://${ip}:3000`);
+console.log('--------------------------------------------------');
+console.log('Available Network Interfaces:');
+if (ips.length === 0) {
+    console.log('  > No External IP found. Are you connected to Wi-Fi?');
+} else {
+    ips.forEach(ip => {
+        console.log(`  > [${ip.name}] ${ip.address}`);
+        console.log(`    App:    http://${ip.address}:3000`);
+        console.log(`    Server: ws://${ip.address}:8080`);
+    });
+}
+console.log('--------------------------------------------------');
+console.log('TIP: If using VPN, turn it OFF or enable "Allow LAN".');
+console.log('     Use the IP that looks like 192.168.x.x');
 console.log('==================================================\n');
 
 wss.on('connection', (ws, req) => {
