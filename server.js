@@ -1,4 +1,3 @@
-
 /*
   SIMPLE WEBSOCKET SERVER FOR SOUL ROTATION TCG
   
@@ -8,6 +7,7 @@
 */
 
 import { WebSocketServer, WebSocket } from 'ws';
+import { networkInterfaces } from 'os';
 
 // host: '0.0.0.0' ensures we listen on all network interfaces, not just localhost
 const wss = new WebSocketServer({ host: '0.0.0.0', port: 8080 });
@@ -15,7 +15,28 @@ const wss = new WebSocketServer({ host: '0.0.0.0', port: 8080 });
 // Store clients by room: { [roomId]: Set<WebSocket> }
 const rooms = {};
 
-console.log('Soul Rotation Game Server running on port 8080');
+// Helper to find the LAN IP address
+const getLocalIp = () => {
+  const nets = networkInterfaces();
+  for (const name of Object.keys(nets)) {
+    for (const net of nets[name]) {
+      // Skip internal (localhost) and non-IPv4
+      if (net.family === 'IPv4' && !net.internal) {
+        return net.address;
+      }
+    }
+  }
+  return 'localhost';
+};
+
+const ip = getLocalIp();
+
+console.log('\n==================================================');
+console.log('SOUL ROTATION GAME SERVER RUNNING');
+console.log(`Listening on port: 8080`);
+console.log(`LAN Access (WebSocket): ws://${ip}:8080`);
+console.log(`LAN Access (Vite App):  http://${ip}:3000`);
+console.log('==================================================\n');
 
 wss.on('connection', (ws, req) => {
   let currentRoom = null;
