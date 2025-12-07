@@ -13,7 +13,7 @@ class SocketService {
   private useFallback: boolean = false;
   private connectionTimeout: any = null;
 
-  // Change this to your actual WebSocket server URL
+  // Default to localhost, but will be updated dynamically in connect()
   private url: string = 'ws://localhost:8080'; 
 
   connect(roomId: string, playerName: string, onConnected: () => void, onError: (err: string) => void) {
@@ -31,21 +31,37 @@ class SocketService {
         this.socket = null;
     }
 
+    // Dynamic URL: Use the hostname the browser is currently using.
+    // This allows devices on the same WiFi (e.g., 192.168.1.5) to connect to the server running on that IP.
+    const hostname = window.location.hostname;
+    this.url = `ws://${hostname}:8080`;
+    
+    // Determine if we are on localhost
+    const isLocalhost = hostname === 'localhost' || hostname === '127.0.0.1';
+
     try {
       console.log(`Attempting to connect to ${this.url}...`);
       this.socket = new WebSocket(`${this.url}?room=${roomId}&name=${playerName}`);
 
-      // Set a timeout: If we don't connect in 1.5 seconds, assume server is down and switch to local
+      // Set a timeout: If we don't connect in 2 seconds, handle failure
       this.connectionTimeout = setTimeout(() => {
           if (!this.isConnected) {
-              console.warn("Server connection timed out. Switching to Local Mode.");
+              console.warn("Server connection timed out.");
               if (this.socket) {
-                  this.socket.close(); // Cancel the pending socket
+                  this.socket.close(); 
                   this.socket = null;
               }
-              this.switchToFallback(roomId, playerName, onConnected);
+              
+              if (isLocalhost) {
+                  // Only fallback to BroadcastChannel if we are actually on localhost dev environment
+                  console.log("Switching to Local Fallback (BroadcastChannel)");
+                  this.switchToFallback(roomId, playerName, onConnected);
+              } else {
+                  // If on LAN/IP, fallback is useless for multiplayer. Error out to warn user.
+                  onError("Connection Timed Out. Check Firewall/IP.");
+              }
           }
-      }, 1500);
+      }, 2000);
 
       this.socket.onopen = () => {
         if (this.connectionTimeout) clearTimeout(this.connectionTimeout);
@@ -74,13 +90,22 @@ class SocketService {
       };
 
       this.socket.onerror = (error) => {
-        console.log('WebSocket failed, switching to Local BroadcastChannel...');
+        console.log('WebSocket connection error.');
         if (this.connectionTimeout) clearTimeout(this.connectionTimeout);
-        this.switchToFallback(roomId, playerName, onConnected);
+        
+        if (isLocalhost) {
+             this.switchToFallback(roomId, playerName, onConnected);
+        } else {
+             onError("Connection Failed. Is the Server Running? Check Firewall.");
+        }
       };
 
     } catch (e) {
-      this.switchToFallback(roomId, playerName, onConnected);
+      if (isLocalhost) {
+           this.switchToFallback(roomId, playerName, onConnected);
+      } else {
+           onError("Connection Error. Check Host IP.");
+      }
     }
   }
 

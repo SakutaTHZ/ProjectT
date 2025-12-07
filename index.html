@@ -4,7 +4,28 @@
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>Soul Rotation TCG</title>
+    <script>
+      // Suppress Tailwind CDN warning about production usage to avoid confusion during LAN play
+      const originalWarn = console.warn;
+      console.warn = (...args) => {
+        if (args[0] && typeof args[0] === 'string' && args[0].includes('cdn.tailwindcss.com')) return;
+        originalWarn.apply(console, args);
+      };
+    </script>
     <script src="https://cdn.tailwindcss.com"></script>
+    <script>
+      tailwind.config = {
+        theme: {
+          extend: {
+            fontFamily: {
+              sans: ['Inter', 'sans-serif'],
+              serif: ['Cinzel', 'serif'],
+              fantasy: ['Cinzel', 'serif'],
+            }
+          }
+        }
+      }
+    </script>
     <link href="https://fonts.googleapis.com/css2?family=Cinzel:wght@400;700&family=Inter:wght@400;600&display=swap" rel="stylesheet">
     <style>
       body {
@@ -13,6 +34,7 @@
         color: #fce7f3; /* Very light gold/pink tint */
         overflow: hidden;
       }
+      /* Fallback if tailwind config doesn't load immediately */
       .font-fantasy {
         font-family: 'Cinzel', serif;
       }
