@@ -192,7 +192,7 @@ const PlayerHUD: React.FC<Props> = ({
                         <div 
                             key={card.id} 
                             style={{ transform: `rotate(${rotate}deg) translateY(${translateY}px)` }}
-                            className="origin-bottom transition-transform hover:!rotate-0 hover:!-translate-y-24 hover:scale-125 hover:z-50 z-0 animate-draw cursor-grab active:cursor-grabbing"
+                            className="origin-bottom transition-transform duration-300 ease-out hover:!rotate-0 hover:!-translate-y-12 hover:scale-110 hover:z-50 z-0 animate-draw cursor-grab active:cursor-grabbing"
                             draggable={player.isTurn && phase === GamePhase.MAIN_PHASE}
                             onDragStart={(e) => onDragStart(e, card)}
                         >
