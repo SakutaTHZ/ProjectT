@@ -13,7 +13,7 @@ class SocketService {
   private useFallback: boolean = false;
   private connectionTimeout: any = null;
 
-  // Default to localhost, but will be updated dynamically in connect()
+  // Default
   private url: string = 'ws://localhost:8080'; 
 
   connect(roomId: string, playerName: string, onConnected: () => void, onError: (err: string) => void) {
@@ -31,19 +31,25 @@ class SocketService {
         this.socket = null;
     }
 
-    // Dynamic URL: Use the hostname the browser is currently using.
-    // This allows devices on the same WiFi (e.g., 192.168.1.5) to connect to the server running on that IP.
-    const hostname = window.location.hostname;
-    this.url = `ws://${hostname}:8080`;
+    // 1. Check for Production Environment Variable first
+    const envUrl = (import.meta as any).env.VITE_WS_URL;
     
-    // Determine if we are on localhost
+    // 2. Dynamic Local URL
+    const hostname = window.location.hostname;
     const isLocalhost = hostname === 'localhost' || hostname === '127.0.0.1';
+    
+    // Priority: Env Var -> Localhost Logic
+    if (envUrl) {
+        this.url = envUrl;
+    } else {
+        this.url = `ws://${hostname}:8080`;
+    }
 
     try {
       console.log(`Attempting to connect to ${this.url}...`);
       this.socket = new WebSocket(`${this.url}?room=${roomId}&name=${playerName}`);
 
-      // Set a timeout: If we don't connect in 2 seconds, handle failure
+      // Set a timeout: If we don't connect in 5 seconds, handle failure
       this.connectionTimeout = setTimeout(() => {
           if (!this.isConnected) {
               console.warn("Server connection timed out.");
@@ -52,16 +58,15 @@ class SocketService {
                   this.socket = null;
               }
               
-              if (isLocalhost) {
-                  // Only fallback to BroadcastChannel if we are actually on localhost dev environment
+              if (isLocalhost && !envUrl) {
+                  // Only fallback to BroadcastChannel if we are actually on localhost dev environment AND no env var was set
                   console.log("Switching to Local Fallback (BroadcastChannel)");
                   this.switchToFallback(roomId, playerName, onConnected);
               } else {
-                  // If on LAN/IP, fallback is useless for multiplayer. Error out to warn user.
-                  onError("Connection Timed Out. Check Firewall/IP.");
+                  onError("Connection Timed Out. Server might be waking up.");
               }
           }
-      }, 2000);
+      }, 5000); // Increased timeout for free tier servers (Render spins down)
 
       this.socket.onopen = () => {
         if (this.connectionTimeout) clearTimeout(this.connectionTimeout);
@@ -93,18 +98,18 @@ class SocketService {
         console.log('WebSocket connection error.');
         if (this.connectionTimeout) clearTimeout(this.connectionTimeout);
         
-        if (isLocalhost) {
+        if (isLocalhost && !envUrl) {
              this.switchToFallback(roomId, playerName, onConnected);
         } else {
-             onError("Connection Failed. Is the Server Running? Check Firewall.");
+             onError("Connection Failed. Server may be offline.");
         }
       };
 
     } catch (e) {
-      if (isLocalhost) {
+      if (isLocalhost && !envUrl) {
            this.switchToFallback(roomId, playerName, onConnected);
       } else {
-           onError("Connection Error. Check Host IP.");
+           onError("Connection Error.");
       }
     }
   }

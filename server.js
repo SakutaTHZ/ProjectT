@@ -9,8 +9,11 @@
 import { WebSocketServer, WebSocket } from 'ws';
 import { networkInterfaces } from 'os';
 
-// host: '0.0.0.0' ensures we listen on all network interfaces, not just localhost
-const wss = new WebSocketServer({ host: '0.0.0.0', port: 8080 });
+// Use the port assigned by the hosting provider (Render/Heroku) or default to 8080
+const PORT = process.env.PORT || 8080;
+
+// host: '0.0.0.0' ensures we listen on all network interfaces
+const wss = new WebSocketServer({ host: '0.0.0.0', port: PORT });
 
 // Store clients by room: { [roomId]: Set<WebSocket> }
 const rooms = {};
@@ -35,7 +38,7 @@ const ips = getLocalIps();
 
 console.log('\n==================================================');
 console.log('SOUL ROTATION GAME SERVER RUNNING');
-console.log(`Listening on port: 8080`);
+console.log(`Listening on port: ${PORT}`);
 console.log('--------------------------------------------------');
 console.log('Available Network Interfaces:');
 if (ips.length === 0) {
@@ -43,13 +46,8 @@ if (ips.length === 0) {
 } else {
     ips.forEach(ip => {
         console.log(`  > [${ip.name}] ${ip.address}`);
-        console.log(`    App:    http://${ip.address}:3000`);
-        console.log(`    Server: ws://${ip.address}:8080`);
     });
 }
-console.log('--------------------------------------------------');
-console.log('TIP: If using VPN, turn it OFF or enable "Allow LAN".');
-console.log('     Use the IP that looks like 192.168.x.x');
 console.log('==================================================\n');
 
 wss.on('connection', (ws, req) => {
