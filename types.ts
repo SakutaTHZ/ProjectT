@@ -1,4 +1,3 @@
-
 export enum CardType {
   ATTACK = 'ATTACK',
   HEAL = 'HEAL',
@@ -59,7 +58,7 @@ export interface PlayerState {
   avatar: string;
   score: number; // Win condition: 3
   soulPoints: number;
-  maxSoulPoints: number; // Usually capped or determined by dice? Game loop says 1-3 dice roll.
+  maxSoulPoints: number; 
   hand: Card[];
   slots: (CardInSlot | null)[]; // 6 Slots in front of player
   disabledSlots: number[]; // Indices of slots that are disabled/locked
@@ -104,7 +103,7 @@ export interface SocketMessage {
 }
 
 export interface OnlineActionPayload {
-  actionType: 'CAST_SPELL' | 'END_TURN' | 'ROLL_DICE' | 'ROTATE' | 'BURN_CARD' | 'PLACE_CARD' | 'RESET_SLOTS' | 'BUY_CARD' | 'CONCEDE' | 'GAME_OVER';
+  actionType: 'CAST_SPELL' | 'END_TURN' | 'ROLL_DICE' | 'ROTATE' | 'BURN_CARD' | 'PLACE_CARD' | 'RESET_SLOTS' | 'BUY_CARD' | 'CONCEDE' | 'GAME_OVER' | 'TRAP_TRIGGERED';
   data: {
       value?: number;
       card?: Card;
@@ -113,5 +112,6 @@ export interface OnlineActionPayload {
       effectTargetSlotIndex?: number;
       currentSoulPoints?: number; // For synchronization
       winnerId?: string;
+      handCount?: number; // For synchronization
   };
 }

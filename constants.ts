@@ -1,4 +1,3 @@
-
 import { Card, CardType, Character, StatusType } from './types';
 
 // Helper to generate IDs
@@ -155,7 +154,7 @@ export const CARDS_DB: Card[] = [
     cost: 1,
     damage: 20,
     type: CardType.TRAP,
-    description: 'Deal 20 Dmg to target.',
+    description: 'Triggers on slot discard. Deal 20 Dmg.',
     image: 'https://picsum.photos/200/300?random=5'
   },
   {
@@ -164,7 +163,7 @@ export const CARDS_DB: Card[] = [
     cost: 2,
     damage: 30,
     type: CardType.TRAP,
-    description: 'Deal 30 Dmg to target.',
+    description: 'Triggers on slot discard. Deal 30 Dmg.',
     image: 'https://picsum.photos/200/300?random=23'
   },
   {
@@ -173,7 +172,7 @@ export const CARDS_DB: Card[] = [
     cost: 3,
     damage: 50,
     type: CardType.TRAP,
-    description: 'Deal 50 Dmg to target.',
+    description: 'Triggers on slot discard. Deal 50 Dmg.',
     image: 'https://picsum.photos/200/300?random=24'
   },
   {
@@ -182,7 +181,7 @@ export const CARDS_DB: Card[] = [
     cost: 1,
     damage: 5,
     type: CardType.TRAP,
-    description: 'Deal 5 Dmg + Weak (-10 Dmg dealt) for 2 turns.',
+    description: 'Triggers on discard. Deal 5 Dmg + Weak.',
     image: 'https://picsum.photos/200/300?random=53',
     applyStatus: { type: StatusType.WEAK, duration: 2, value: 10 }
   },
@@ -192,7 +191,7 @@ export const CARDS_DB: Card[] = [
     cost: 2,
     damage: 30,
     type: CardType.TRAP,
-    description: 'Reflect 30 damage.',
+    description: 'Triggers on discard. Reflect 30 damage.',
     image: 'https://picsum.photos/200/300?random=26'
   },
 
@@ -250,7 +249,7 @@ export const CARDS_DB: Card[] = [
     cost: 2,
     damage: 0,
     type: CardType.DISCARD,
-    description: 'Discard 1 Random Enemy Card.',
+    description: 'Select 1 enemy spell slot to discard.',
     image: 'https://picsum.photos/200/300?random=7'
   },
   {
@@ -259,7 +258,7 @@ export const CARDS_DB: Card[] = [
     cost: 3,
     damage: 0,
     type: CardType.DISCARD,
-    description: 'Discard 2 Random Enemy Cards.',
+    description: 'Select 2 enemy spell slots to discard.',
     image: 'https://picsum.photos/200/300?random=31'
   },
   {
@@ -268,7 +267,7 @@ export const CARDS_DB: Card[] = [
     cost: 1,
     damage: 0,
     type: CardType.DISCARD,
-    description: 'Opponent Discards 1, You Draw 1.',
+    description: 'Discard 1 enemy spell slot. You draw 1.',
     image: 'https://picsum.photos/200/300?random=32'
   },
   {
@@ -277,7 +276,7 @@ export const CARDS_DB: Card[] = [
     cost: 2,
     damage: 0,
     type: CardType.DISCARD,
-    description: 'Discard 1 Card. Deal 10 Dmg to Front.',
+    description: 'Discard 1 slot. Deal 10 Dmg to Front.',
     image: 'https://picsum.photos/200/300?random=33'
   },
   {
@@ -286,7 +285,7 @@ export const CARDS_DB: Card[] = [
     cost: 1,
     damage: 0,
     type: CardType.DISCARD,
-    description: 'Discard 1 Card. Target acts randomly (Flavor).',
+    description: 'Discard 1 card. Target acts randomly.',
     image: 'https://picsum.photos/200/300?random=34'
   },
 
