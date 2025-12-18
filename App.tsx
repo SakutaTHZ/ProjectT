@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { Card, Character, PlayerState, GamePhase, CardType, LogEntry, LogType, StatusType, StatusEffect, GameMode, OnlineActionPayload, SocketMessage } from './types';
+import { Card, Character, PlayerState, GamePhase, CardType, LogEntry, LogType, StatusType, StatusEffect, GameMode, OnlineActionPayload, SocketMessage, DeckLoadout } from './types';
 import { CARDS_DB, INITIAL_CHARACTERS_PLAYER, INITIAL_CHARACTERS_OPPONENT, MAX_SCORE } from './constants';
 import { socketService } from './services/socket';
 import { RotateCw, Swords, Ghost, Plus, Wifi, WifiOff, Clock } from 'lucide-react';
@@ -236,8 +236,8 @@ const App: React.FC = () => {
       setShowLog(false);
       setShowSettings(false);
       setShowCardLibrary(false);
-      setPlayer({ ...player, score: 0, soulPoints: 0, hand: [], slots: Array(6).fill(null), disabledSlots: [], deck: [], discard: [], lastPlayedCard: null, board: deepClone(INITIAL_CHARACTERS_PLAYER), isTurn: true, diceRolled: false });
-      setOpponent({ ...opponent, score: 0, soulPoints: 0, hand: [], slots: Array(6).fill(null), disabledSlots: [], deck: [], discard: [], lastPlayedCard: null, board: deepClone(INITIAL_CHARACTERS_OPPONENT), isTurn: false, diceRolled: false });
+      setPlayer(prev => ({ ...prev, score: 0, soulPoints: 0, hand: [], slots: Array(6).fill(null), disabledSlots: [], deck: [], discard: [], lastPlayedCard: null, board: deepClone(INITIAL_CHARACTERS_PLAYER), isTurn: true, diceRolled: false }));
+      setOpponent(prev => ({ ...prev, score: 0, soulPoints: 0, hand: [], slots: Array(6).fill(null), disabledSlots: [], deck: [], discard: [], lastPlayedCard: null, board: deepClone(INITIAL_CHARACTERS_OPPONENT), isTurn: false, diceRolled: false }));
       setShowDiceOverlay(false);
       setDiceResult(null);
       setSelectedCardId(null);
@@ -252,37 +252,51 @@ const App: React.FC = () => {
     setTurnCount(1);
     setGameTime(0);
     const initialPlayerDeck = customDeck ? [...customDeck] : generateDeck(30);
-    if (customDeck) {
-        for (let i = initialPlayerDeck.length - 1; i > 0; i--) {
-            const j = Math.floor(Math.random() * (i + 1));
-            [initialPlayerDeck[i], initialPlayerDeck[j]] = [initialPlayerDeck[j], initialPlayerDeck[i]];
-        }
+    // Shuffle the deck if it's from custom to ensure variety
+    for (let i = initialPlayerDeck.length - 1; i > 0; i--) {
+        const j = Math.floor(Math.random() * (i + 1));
+        [initialPlayerDeck[i], initialPlayerDeck[j]] = [initialPlayerDeck[j], initialPlayerDeck[i]];
     }
+    
     const initialOpponentDeck = generateDeck(30);
     let initialPlayer = { ...player, deck: initialPlayerDeck, lastPlayedCard: null };
-    if (customCharacters) initialPlayer.board = customCharacters.map((c, idx) => ({ ...c, position: idx as 0 | 1 | 2, currentHealth: c.maxHealth, isDead: false, statuses: [] }));
-    else initialPlayer.board = deepClone(INITIAL_CHARACTERS_PLAYER);
+    if (customCharacters && customCharacters.length === 3) {
+        initialPlayer.board = customCharacters.map((c, idx) => ({ 
+            ...c, 
+            position: idx as 0 | 1 | 2, 
+            currentHealth: c.maxHealth, 
+            isDead: false, 
+            statuses: [] 
+        }));
+    } else {
+        initialPlayer.board = deepClone(INITIAL_CHARACTERS_PLAYER);
+    }
+    
     let initialOpponent = { ...opponent, deck: initialOpponentDeck, lastPlayedCard: null };
     initialOpponent.board = deepClone(INITIAL_CHARACTERS_OPPONENT);
+    
     initialPlayer = drawCard(initialPlayer, 4);
     initialOpponent = drawCard(initialOpponent, 4);
+    
     setPlayer(initialPlayer);
     setOpponent(initialOpponent);
   };
 
-  const startGame = (customDeck?: Card[], customCharacters?: Character[]) => {
+  const startGame = (name: string, customDeck?: Card[], customCharacters?: Character[]) => {
+    setPlayer(prev => ({ ...prev, name }));
     setupBoardState(customDeck, customCharacters);
     setPhase(GamePhase.ROLL_PHASE);
     setShowDiceOverlay(true);
-    addLog("Match Started! Roll the Soul Dice.", 'system');
+    addLog(`Welcome ${name}! Roll the Soul Dice.`, 'system');
   };
   
-  const startOnlineGame = (roomId: string) => {
+  const startOnlineGame = (name: string, roomId: string) => {
+      setPlayer(prev => ({ ...prev, name }));
       setGameMode(GameMode.ONLINE);
       setupBoardState();
       setPhase(GamePhase.WAITING_FOR_OPPONENT);
-      addLog(`Connecting to Room: ${roomId}...`, 'system');
-      socketService.connect(roomId, player.name, 
+      addLog(`Connecting as ${name} to Room: ${roomId}...`, 'system');
+      socketService.connect(roomId, name, 
         () => addLog("Connected to lobby. Waiting for response...", 'system'),
         (err) => { addLog(err, 'system'); setTimeout(resetGame, 3000); }
       );
@@ -313,7 +327,6 @@ const App: React.FC = () => {
                 setNotification("Opponent's Turn");
                 break;
             case 'SYNC_LOADOUT':
-                addLog(`Opponent synced loadout.`, 'system');
                 setOpponent(prev => ({ ...prev, name: msg.payload.name, board: msg.payload.board }));
                 break;
             case 'ACTION':
@@ -357,26 +370,6 @@ const App: React.FC = () => {
                  return { ...prev, slots: newSlots, hand: syncHand(prev) };
              });
              addLog("Opponent set a card.", 'opponent');
-      }
-      else if (payload.actionType === 'RESET_SLOTS') {
-             setOpponent(prev => {
-                 const newSlots = [...prev.slots];
-                 for(let i=0; i<newSlots.length; i++) { if (newSlots[i] && !newSlots[i]?.isReady) newSlots[i] = null; }
-                 return { ...prev, slots: newSlots, hand: syncHand(prev) };
-             });
-      }
-      else if (payload.actionType === 'BUY_CARD') {
-             setOpponent(prev => ({ ...prev, soulPoints: payload.data.currentSoulPoints ?? (prev.soulPoints - 2), hand: syncHand(prev) }));
-             addLog("Opponent sacrificed souls for a card.", 'opponent');
-      }
-      else if (payload.actionType === 'BURN_CARD') {
-           setOpponent(prev => {
-                const newSlots = [...prev.slots];
-                const slotIndex = payload.data.slotIndex;
-                if(slotIndex !== undefined && newSlots[slotIndex]) newSlots[slotIndex] = null;
-                return { ...prev, slots: newSlots, soulPoints: payload.data.currentSoulPoints ?? (prev.soulPoints + 1), hand: syncHand(prev) };
-           });
-           addLog("Opponent sacrificed a spell.", 'opponent');
       }
       else if (payload.actionType === 'TRAP_TRIGGERED') {
            const { card, currentSoulPoints } = payload.data;
@@ -518,14 +511,19 @@ const App: React.FC = () => {
     const card = slot.card;
     const cost = getEffectiveCost(card, player);
     if (player.soulPoints < cost) { addLog("Not enough Soul Points!", 'system'); return; }
+    
+    // Direct Self-Cast Spells
     if (["Soul Harvest", "Soul Infusion", "Greed", "Focus", "Preparation", "Clairvoyance", "Spell Shatter", "Equalizing Flow", "Rapid Reflex", "Unstable Rift", "Eagle Eye"].includes(card.name)) { 
         handleSpellExecution(player, setPlayer, player, setPlayer, card, player.id, slotIndex); return; 
     }
-    if (["Mind Rot", "Amnesia", "Thought Theft", "Soul Drain"].includes(card.name)) { 
+    
+    // Target Selection Spells
+    if (["Mind Rot", "Amnesia", "Thought Theft", "Soul Drain", "Lockdown"].includes(card.name) || card.type === CardType.DISCARD) { 
         setSelectedCardId(card.id);
         addLog(`Select enemy SPELL SLOT to discard.`, 'system');
         return; 
     }
+    
     if (selectedCardId === card.id) setSelectedCardId(null);
     else {
       setSelectedCardId(card.id);
@@ -584,25 +582,39 @@ const App: React.FC = () => {
     targeter: PlayerState, setTargeter: React.Dispatch<React.SetStateAction<PlayerState>>, 
     card: Card, targetId: string, slotIndex: number, effectTargetSlotIndex?: number
   ) => {
-      // TRAP CHECK: If I am casting on Opponent's Slot
+      // TRAP CHECK: Triggered when casting on Enemy slots
       if (caster.id === 'player' && targeter.id === 'opponent' && effectTargetSlotIndex !== undefined && card.type === CardType.DISCARD) {
-          const trapSlotIdx = targeter.slots.findIndex(s => s && s.isReady && s.card.type === CardType.TRAP);
-          const trapSlot = trapSlotIdx !== -1 ? targeter.slots[trapSlotIdx] : null;
-          if (trapSlot && targeter.soulPoints >= getEffectiveCost(trapSlot.card, targeter)) {
-              addLog(`TRAP TRIGGERED! ${trapSlot.card.name} counters ${card.name}!`, 'system');
-              const trapCard = trapSlot.card;
-              const nextTrapOwnerSP = targeter.soulPoints - getEffectiveCost(trapCard, targeter);
-              if (gameMode === GameMode.ONLINE) socketService.sendAction({ actionType: 'TRAP_TRIGGERED', data: { card: trapCard, currentSoulPoints: nextTrapOwnerSP } });
-              executeSpell(targeter, setTargeter, caster, setCaster, trapCard, caster.board.find(c => c.position === 0)?.id || '', -1);
-              setTargeter(prev => { const n = [...prev.slots]; n[trapSlotIdx] = null; return { ...prev, slots: n, soulPoints: nextTrapOwnerSP, discard: [...prev.discard, trapCard] }; });
-              setCaster(prev => {
-                  const cost = getEffectiveCost(card, prev);
-                  const nSlots = [...prev.slots]; if (slotIndex >= 0) nSlots[slotIndex] = null;
-                  const nextHand = slotIndex < 0 ? prev.hand.filter(c => c.id !== card.id) : prev.hand;
-                  if (gameMode === GameMode.ONLINE) socketService.sendAction({ actionType: 'CAST_SPELL', data: { card, targetId: 'COUNTERED', slotIndex, currentSoulPoints: prev.soulPoints - cost, handCount: nextHand.length } });
-                  return { ...prev, slots: nSlots, hand: nextHand, soulPoints: prev.soulPoints - cost, discard: [...prev.discard, card] };
-              });
-              return;
+          const trapIdx = targeter.slots.findIndex(s => s && s.isReady && s.card.type === CardType.TRAP);
+          if (trapIdx !== -1) {
+              const trapSlot = targeter.slots[trapIdx]!;
+              const trapCost = getEffectiveCost(trapSlot.card, targeter);
+              if (targeter.soulPoints >= trapCost) {
+                  addLog(`TRAP TRIGGERED! ${targeter.name}'s ${trapSlot.card.name} counters you!`, 'system');
+                  const trapCard = trapSlot.card;
+                  const nextOpponentSP = targeter.soulPoints - trapCost;
+                  
+                  // Trigger Trap Effect on Me
+                  executeSpell(targeter, setTargeter, caster, setCaster, trapCard, caster.board.find(c => c.position === 0)?.id || '', -1);
+                  
+                  // Consume Trap
+                  setTargeter(prev => { 
+                      const n = [...prev.slots]; n[trapIdx] = null; 
+                      return { ...prev, slots: n, soulPoints: nextOpponentSP, discard: [...prev.discard, trapCard] }; 
+                  });
+                  
+                  // Consume Attacker Spell and SP (but negate effect)
+                  setCaster(prev => {
+                      const cCost = getEffectiveCost(card, prev);
+                      const nSlots = [...prev.slots]; if (slotIndex >= 0) nSlots[slotIndex] = null;
+                      const nextHand = slotIndex < 0 ? prev.hand.filter(c => c.id !== card.id) : prev.hand;
+                      if (gameMode === GameMode.ONLINE) {
+                          socketService.sendAction({ actionType: 'TRAP_TRIGGERED', data: { card: trapCard, currentSoulPoints: nextOpponentSP, handCount: nextHand.length } });
+                          socketService.sendAction({ actionType: 'CAST_SPELL', data: { card, targetId: 'COUNTERED', slotIndex, currentSoulPoints: prev.soulPoints - cCost, handCount: nextHand.length } });
+                      }
+                      return { ...prev, slots: nSlots, hand: nextHand, soulPoints: prev.soulPoints - cCost, discard: [...prev.discard, card] };
+                  });
+                  return;
+              }
           }
       }
 
@@ -628,6 +640,7 @@ const App: React.FC = () => {
     setIsProcessing(true);
     if (slotIndex >= 0) setCastingSlot({ playerId: caster.id, slotIndex });
     addLog(`${caster.name} cast ${card.name}!`, caster.id === 'player' ? 'player' : 'opponent');
+    
     setTimeout(() => {
         const activeCasterChar = caster.board.find(c => c.position === 0);
         const hasSylphy = caster.board.some(c => c.name === 'Sylphy' && !c.isDead && c.position === 0);
@@ -642,30 +655,13 @@ const App: React.FC = () => {
             if (effectTargetSlotIndex !== undefined && newTargetSlots[effectTargetSlotIndex]) {
                 newTargetDiscard.push(newTargetSlots[effectTargetSlotIndex]!.card);
                 newTargetSlots[effectTargetSlotIndex] = null;
-                if (card.name === "Amnesia") {
-                    const others = newTargetSlots.map((s, i) => s ? i : -1).filter(i => i !== -1 && i !== effectTargetSlotIndex);
-                    if (others.length > 0) {
-                        const r = others[Math.floor(Math.random() * others.length)];
-                        newTargetDiscard.push(newTargetSlots[r]!.card);
-                        newTargetSlots[r] = null;
-                    }
-                }
             } else if (newTargetHand.length > 0) {
                 const ridx = Math.floor(Math.random() * newTargetHand.length);
                 newTargetDiscard.push(newTargetHand.splice(ridx, 1)[0]);
             }
-        } else if (card.type === CardType.INSTANT) {
-            if (card.name === "Spell Shatter") {
-                let occ = newTargetSlots.map((s, i) => s ? i : -1).filter(i => i !== -1);
-                for(let i=0; i<2; i++) { if (occ.length === 0) break; const r = Math.floor(Math.random() * occ.length); newTargetSlots[occ[r]] = null; occ.splice(r, 1); }
-            } else if (card.name === "Equalizing Flow") {
-                const casterRemaining = caster.soulPoints - cost;
-                newTargetSoulPoints = Math.floor((casterRemaining + targeter.soulPoints) / 2);
-            }
         } else if (card.type === CardType.MANIPULATION) {
             if (card.name === "Lockdown") {
                 if (effectTargetSlotIndex !== undefined && !newTargetDisabledSlots.includes(effectTargetSlotIndex)) newTargetDisabledSlots.push(effectTargetSlotIndex);
-                else { const pos = [0,1,2,3,4,5].filter(i => !newTargetDisabledSlots.includes(i)); if (pos.length > 0) newTargetDisabledSlots.push(pos[Math.floor(Math.random()*pos.length)]); }
             } else if (card.name === "Soul Drain") { if (newTargetSoulPoints > 0) { newTargetSoulPoints -= 1; stolenSouls = 1; } }
         } else if (card.type !== CardType.UTILITY) {
             newTargetBoard = newTargetBoard.map(char => {
@@ -676,7 +672,8 @@ const App: React.FC = () => {
                         if (char.statuses.some(s => s.type === StatusType.FRAGILE)) damage += 10;
                         if (activeCasterChar?.statuses.some(s => s.type === StatusType.WEAK)) damage = Math.max(0, damage - 10);
                         if (char.position === 0) {
-                            if (char.name === 'Ashlen') damage -= 5; if (char.name === 'Vorg') damage -= 10;  
+                            if (char.name === 'Ashlen') damage -= 5; 
+                            if (char.name === 'Vorg') damage -= 10;  
                             if (char.name === 'Ragnar' && card.type === CardType.ATTACK) reflectDamage = 5; 
                         }
                         newHealth = Math.max(0, char.currentHealth - Math.max(0, damage));
@@ -690,6 +687,7 @@ const App: React.FC = () => {
                 return char;
             });
         }
+        
         const newScore = caster.score + killCount;
         setCaster(prev => {
              let newState = { ...prev };
@@ -704,24 +702,19 @@ const App: React.FC = () => {
                 if (reflectDamage > 0) { const a = newState.board.find(c => c.position === 0); if (a) { a.currentHealth = Math.max(0, a.currentHealth - reflectDamage); a.animationState = 'hit'; } }
              }
              if (["Soul Harvest", "Rapid Reflex"].includes(card.name)) newState = drawCard(newState, 2);
-             if (card.name === "Greed") newState = drawCard(newState, 3);
-             if (card.name === "Clairvoyance") newState = drawCard(newState, 1);
              if (card.name === "Focus") newState.soulPoints += 1;
-             if (card.name === "Preparation" || card.name === "Soul Infusion") newState.soulPoints += 2;
-             if (card.name === "Unstable Rift") { newState.discard = [...newState.discard, ...newState.hand]; newState.hand = []; newState = drawCard(newState, 3); }
              newState.score = newScore;
              return newState;
         });
-        if (caster.id !== targeter.id) setTargeter(prev => {
-            let next = { ...prev, board: newTargetBoard, hand: newTargetHand, discard: newTargetDiscard, disabledSlots: newTargetDisabledSlots, soulPoints: newTargetSoulPoints, slots: newTargetSlots };
-            if (card.name === "Unstable Rift") next = drawCard(next, 3);
-            return next;
-        });
+        
+        if (caster.id !== targeter.id) setTargeter(prev => ({ ...prev, board: newTargetBoard, hand: newTargetHand, discard: newTargetDiscard, disabledSlots: newTargetDisabledSlots, soulPoints: newTargetSoulPoints, slots: newTargetSlots }));
+        
         setCastingSlot(null); setIsProcessing(false);
         setTimeout(() => {
             setTargeter(prev => ({ ...prev, board: prev.board.map(c => ({ ...c, animationState: undefined })) }));
             setCaster(prev => ({ ...prev, board: prev.board.map(c => ({ ...c, animationState: undefined })) }));
         }, 600);
+        
         if (newScore >= MAX_SCORE || newTargetBoard.every(c => c.isDead)) {
             setPhase(GamePhase.GAME_OVER);
             addLog(caster.id === 'player' ? "VICTORY!" : "DEFEAT!", 'system');
@@ -781,8 +774,8 @@ const App: React.FC = () => {
     }
   }, [phase, gameMode]);
 
-  if (phase === GamePhase.START) return <><StartScreen onStart={() => startGame()} onStartOnline={startOnlineGame} onOpenLibrary={() => setShowCardLibrary(true)} onOpenDeckBuilder={() => setPhase(GamePhase.DECK_BUILDING)} />{showCardLibrary && <CardLibraryModal onClose={() => setShowCardLibrary(false)} />}</>;
-  if (phase === GamePhase.DECK_BUILDING) return <DeckBuilderScreen onBack={() => setPhase(GamePhase.START)} onStartGame={(deck, chars) => startGame(deck, chars)} />;
+  if (phase === GamePhase.START) return <><StartScreen onStart={startGame} onStartOnline={startOnlineGame} onOpenLibrary={() => setShowCardLibrary(true)} onOpenDeckBuilder={() => setPhase(GamePhase.DECK_BUILDING)} />{showCardLibrary && <CardLibraryModal onClose={() => setShowCardLibrary(false)} />}</>;
+  if (phase === GamePhase.DECK_BUILDING) return <DeckBuilderScreen onBack={() => setPhase(GamePhase.START)} onStartGame={(deck, chars) => startGame(player.name, deck, chars)} />;
 
   return (
     <div className="w-full h-screen bg-black text-amber-100 overflow-hidden flex flex-col relative select-none">

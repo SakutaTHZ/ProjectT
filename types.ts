@@ -95,6 +95,12 @@ export interface LogEntry {
   turn: number;
 }
 
+export interface DeckLoadout {
+  name: string;
+  cards: Card[];
+  squad: Character[];
+}
+
 // --- SOCKET TYPES ---
 
 export interface SocketMessage {
@@ -113,5 +119,6 @@ export interface OnlineActionPayload {
       currentSoulPoints?: number; // For synchronization
       winnerId?: string;
       handCount?: number; // For synchronization
+      playerName?: string; // For syncing names
   };
 }

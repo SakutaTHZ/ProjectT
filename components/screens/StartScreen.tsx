@@ -1,21 +1,25 @@
-
-import React, { useState } from 'react';
-import { Play, BookOpen, Layers, Globe, Users, X } from 'lucide-react';
+import React, { useState, useEffect } from 'react';
+import { Play, BookOpen, Layers, Globe, Users, X, User } from 'lucide-react';
 
 interface Props {
-  onStart: () => void;
-  onStartOnline: (roomId: string) => void;
+  onStart: (name: string) => void;
+  onStartOnline: (name: string, roomId: string) => void;
   onOpenLibrary: () => void;
   onOpenDeckBuilder: () => void;
 }
 
 const StartScreen: React.FC<Props> = ({ onStart, onStartOnline, onOpenLibrary, onOpenDeckBuilder }) => {
   const [showOnlineModal, setShowOnlineModal] = useState(false);
+  const [playerName, setPlayerName] = useState(localStorage.getItem('soul_rotation_name') || 'SakutaTHZ');
   const [roomId, setRoomId] = useState('');
+
+  useEffect(() => {
+      localStorage.setItem('soul_rotation_name', playerName);
+  }, [playerName]);
 
   const handleOnlineJoin = () => {
       if(roomId.trim().length > 0) {
-          onStartOnline(roomId);
+          onStartOnline(playerName, roomId);
       }
   };
 
@@ -31,18 +35,27 @@ const StartScreen: React.FC<Props> = ({ onStart, onStartOnline, onOpenLibrary, o
           <div className="absolute bottom-0 right-0 w-32 h-32 border-b-2 border-r-2 border-yellow-700/50"></div>
       </div>
 
-      <div className="relative z-10 flex flex-col items-center gap-12 animate-in fade-in zoom-in duration-1000">
+      <div className="relative z-10 flex flex-col items-center gap-8 animate-in fade-in zoom-in duration-1000">
           <div className="flex flex-col items-center">
-              <div className="w-1 h-20 bg-gradient-to-b from-transparent via-yellow-500 to-transparent mb-6"></div>
               <h1 className="text-6xl md:text-8xl font-fantasy text-transparent bg-clip-text bg-gradient-to-b from-yellow-200 via-yellow-500 to-yellow-800 drop-shadow-[0_0_30px_rgba(234,179,8,0.4)] tracking-widest text-center">
               SOUL<br/>ROTATION
               </h1>
-              <div className="w-64 h-[1px] bg-gradient-to-r from-transparent via-yellow-700 to-transparent mt-6"></div>
+              <div className="w-64 h-[1px] bg-gradient-to-r from-transparent via-yellow-700 to-transparent mt-4"></div>
           </div>
           
-          <p className="text-neutral-400 max-w-md text-center font-serif italic text-lg leading-relaxed">
-            "Master the cycle. Command the soul. Break the loop."
-          </p>
+          {/* Name Input Section */}
+          <div className="flex flex-col items-center gap-2 bg-neutral-900/40 p-4 border border-yellow-900/20 backdrop-blur-sm">
+             <div className="flex items-center gap-3 text-yellow-500/70 uppercase tracking-[0.2em] text-[10px] font-bold">
+                 <User size={12} /> Identity Required
+             </div>
+             <input 
+                type="text"
+                value={playerName}
+                onChange={(e) => setPlayerName(e.target.value.substring(0, 15))}
+                className="bg-transparent border-b border-yellow-600/50 text-center py-1 text-xl font-fantasy text-yellow-200 focus:outline-none focus:border-yellow-400 transition-colors w-48"
+                placeholder="Name..."
+             />
+          </div>
           
           <div className="flex flex-col gap-4 w-64">
               <button 
@@ -52,7 +65,7 @@ const StartScreen: React.FC<Props> = ({ onStart, onStartOnline, onOpenLibrary, o
                  <div className="absolute inset-0 bg-neutral-900/80 group-hover:bg-neutral-800 transition-colors"></div>
                  <div className="relative flex items-center justify-center gap-3 text-yellow-600 group-hover:text-yellow-400">
                     <Layers size={18} />
-                    <span className="font-bold uppercase tracking-widest text-sm">Deck Builder</span>
+                    <span className="font-bold uppercase tracking-widest text-sm">Forge Squad</span>
                  </div>
               </button>
 
@@ -63,7 +76,7 @@ const StartScreen: React.FC<Props> = ({ onStart, onStartOnline, onOpenLibrary, o
                  <div className="absolute inset-0 bg-neutral-900/80 group-hover:bg-neutral-800 transition-colors"></div>
                  <div className="relative flex items-center justify-center gap-3 text-yellow-600 group-hover:text-yellow-400">
                     <BookOpen size={18} />
-                    <span className="font-bold uppercase tracking-widest text-sm">Card Library</span>
+                    <span className="font-bold uppercase tracking-widest text-sm">Codex</span>
                  </div>
               </button>
 
@@ -81,33 +94,23 @@ const StartScreen: React.FC<Props> = ({ onStart, onStartOnline, onOpenLibrary, o
               <div className="h-[1px] bg-neutral-800 my-2"></div>
 
               <button 
-                onClick={onStart}
+                onClick={() => onStart(playerName)}
                 className="group relative px-8 py-5 bg-transparent overflow-hidden rounded-none transition-all cursor-pointer"
               >
-                {/* Button Background */}
                 <div className="absolute inset-0 bg-neutral-900 group-hover:bg-neutral-800 transition-colors"></div>
-                
-                {/* Gold Borders */}
                 <div className="absolute top-0 left-0 w-full h-[1px] bg-gradient-to-r from-transparent via-yellow-500 to-transparent"></div>
                 <div className="absolute bottom-0 left-0 w-full h-[1px] bg-gradient-to-r from-transparent via-yellow-500 to-transparent"></div>
-                <div className="absolute top-0 left-0 h-full w-[1px] bg-gradient-to-b from-transparent via-yellow-500 to-transparent opacity-50"></div>
-                <div className="absolute top-0 right-0 h-full w-[1px] bg-gradient-to-b from-transparent via-yellow-500 to-transparent opacity-50"></div>
                 
-                {/* Content */}
                 <div className="relative flex items-center justify-center gap-4">
                     <span className="text-xl font-bold uppercase tracking-[0.2em] text-yellow-500 group-hover:text-yellow-400 group-hover:drop-shadow-[0_0_10px_rgba(234,179,8,0.8)] transition-all">
                         Vs AI
                     </span>
                     <Play size={20} className="text-yellow-600 group-hover:text-yellow-400 fill-current transition-colors" />
                 </div>
-                
-                {/* Hover Glow */}
-                <div className="absolute inset-0 bg-yellow-500/5 opacity-0 group-hover:opacity-100 transition-opacity"></div>
               </button>
           </div>
       </div>
       
-      {/* Online Modal */}
       {showOnlineModal && (
           <div className="absolute inset-0 z-50 bg-black/90 backdrop-blur-md flex items-center justify-center">
               <div className="bg-neutral-900 border border-yellow-700 p-8 relative w-96 shadow-2xl animate-in zoom-in duration-300">
@@ -132,21 +135,13 @@ const StartScreen: React.FC<Props> = ({ onStart, onStartOnline, onOpenLibrary, o
                       >
                           Join / Create
                       </button>
-                      <div className="bg-neutral-950 p-2 rounded border border-neutral-800 mt-2">
-                        <p className="text-[10px] text-neutral-400 text-center">
-                            <span className="text-yellow-600 font-bold block mb-1">How to Connect:</span>
-                            1. Run <code>npm run dev</code> for the game.<br/>
-                            2. Run <code>node server.js</code> for multiplayer.<br/>
-                            <span className="italic block mt-1 text-neutral-600">If server is missing, game defaults to Local Mode (Same Browser Only).</span>
-                        </p>
-                      </div>
                   </div>
               </div>
           </div>
       )}
 
       <div className="absolute bottom-8 text-[10px] text-neutral-600 uppercase tracking-widest font-bold">
-          Tactical TCG v1.3
+          Tactical TCG v1.4 • Soul Rotation
       </div>
     </div>
   );

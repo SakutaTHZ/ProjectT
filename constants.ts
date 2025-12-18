@@ -1,7 +1,4 @@
-import { Card, CardType, Character, StatusType } from './types';
-
-// Helper to generate IDs
-const uuid = () => Math.random().toString(36).substr(2, 9);
+import { Card, CardType, Character, StatusType, DeckLoadout } from './types';
 
 export const CARDS_DB: Card[] = [
   // --- ATTACK ---
@@ -19,9 +16,9 @@ export const CARDS_DB: Card[] = [
     id: 'atk-2',
     name: 'Snipe',
     cost: 2,
-    damage: 40,
+    damage: 35,
     type: CardType.ATTACK,
-    description: 'Deal 40 Dmg. Can hit Back.',
+    description: 'Deal 35 Dmg. Can hit Back.',
     image: 'https://picsum.photos/200/300?random=2',
     canTargetBackline: true
   },
@@ -36,37 +33,6 @@ export const CARDS_DB: Card[] = [
     canTargetBackline: false
   },
   {
-    id: 'atk-4',
-    name: 'Shadow Strike',
-    cost: 1,
-    damage: 15,
-    type: CardType.ATTACK,
-    description: 'Deal 15 Dmg. Can hit Back.',
-    image: 'https://picsum.photos/200/300?random=13',
-    canTargetBackline: true
-  },
-  {
-    id: 'atk-5',
-    name: 'Cleave',
-    cost: 2,
-    damage: 30,
-    type: CardType.ATTACK,
-    description: 'Deal 30 Dmg to Front.',
-    image: 'https://picsum.photos/200/300?random=14',
-    canTargetBackline: false
-  },
-  {
-    id: 'atk-6',
-    name: 'Execution',
-    cost: 3,
-    damage: 80,
-    type: CardType.ATTACK,
-    description: 'Deal 80 Dmg to Front.',
-    image: 'https://picsum.photos/200/300?random=15',
-    canTargetBackline: false
-  },
-  // New Status Attacks
-  {
     id: 'atk-ignite',
     name: 'Ignite',
     cost: 1,
@@ -76,28 +42,6 @@ export const CARDS_DB: Card[] = [
     image: 'https://picsum.photos/200/300?random=50',
     canTargetBackline: false,
     applyStatus: { type: StatusType.BURN, duration: 2, value: 10 }
-  },
-  {
-    id: 'atk-shatter',
-    name: 'Shatter Armor',
-    cost: 2,
-    damage: 10,
-    type: CardType.ATTACK,
-    description: 'Deal 10 Dmg + Fragile (+10 Dmg taken) for 2 turns.',
-    image: 'https://picsum.photos/200/300?random=51',
-    canTargetBackline: false,
-    applyStatus: { type: StatusType.FRAGILE, duration: 2, value: 10 }
-  },
-  {
-    id: 'atk-stun',
-    name: 'Concussion',
-    cost: 2,
-    damage: 15,
-    type: CardType.ATTACK,
-    description: 'Deal 15 Dmg + Stun (Prevents Rotation) for 1 turn.',
-    image: 'https://picsum.photos/200/300?random=52',
-    canTargetBackline: false,
-    applyStatus: { type: StatusType.STUN, duration: 1 }
   },
 
   // --- HEAL ---
@@ -119,79 +63,24 @@ export const CARDS_DB: Card[] = [
     description: 'Heal 50 HP.',
     image: 'https://picsum.photos/200/300?random=16'
   },
-  {
-    id: 'heal-3',
-    name: 'Mend',
-    cost: 0,
-    damage: -10,
-    type: CardType.HEAL,
-    description: 'Heal 10 HP.',
-    image: 'https://picsum.photos/200/300?random=17'
-  },
-  {
-    id: 'heal-4',
-    name: 'Divine Grace',
-    cost: 3,
-    damage: -100,
-    type: CardType.HEAL,
-    description: 'Heal 100 HP.',
-    image: 'https://picsum.photos/200/300?random=18'
-  },
-  {
-    id: 'heal-5',
-    name: 'Regrowth',
-    cost: 1,
-    damage: -30,
-    type: CardType.HEAL,
-    description: 'Heal 30 HP.',
-    image: 'https://picsum.photos/200/300?random=19'
-  },
 
   // --- TRAP ---
   {
     id: 'trap-1',
     name: 'Bear Trap',
     cost: 1,
-    damage: 20,
+    damage: 25,
     type: CardType.TRAP,
-    description: 'Triggers on slot discard. Deal 20 Dmg.',
+    description: 'Counters slot discard. Deal 25 Dmg.',
     image: 'https://picsum.photos/200/300?random=5'
-  },
-  {
-    id: 'trap-2',
-    name: 'Spike Pit',
-    cost: 2,
-    damage: 30,
-    type: CardType.TRAP,
-    description: 'Triggers on slot discard. Deal 30 Dmg.',
-    image: 'https://picsum.photos/200/300?random=23'
-  },
-  {
-    id: 'trap-3',
-    name: 'Explosive Rune',
-    cost: 3,
-    damage: 50,
-    type: CardType.TRAP,
-    description: 'Triggers on slot discard. Deal 50 Dmg.',
-    image: 'https://picsum.photos/200/300?random=24'
-  },
-  {
-    id: 'trap-weak',
-    name: 'Intimidate',
-    cost: 1,
-    damage: 5,
-    type: CardType.TRAP,
-    description: 'Triggers on discard. Deal 5 Dmg + Weak.',
-    image: 'https://picsum.photos/200/300?random=53',
-    applyStatus: { type: StatusType.WEAK, duration: 2, value: 10 }
   },
   {
     id: 'trap-mirror',
     name: 'Mirror Force',
     cost: 2,
-    damage: 30,
+    damage: 40,
     type: CardType.TRAP,
-    description: 'Triggers on discard. Reflect 30 damage.',
+    description: 'Counters slot discard. Deal 40 Dmg.',
     image: 'https://picsum.photos/200/300?random=26'
   },
 
@@ -214,33 +103,6 @@ export const CARDS_DB: Card[] = [
     description: 'Gain 1 Soul Point.',
     image: 'https://picsum.photos/200/300?random=27'
   },
-  {
-    id: 'util-3',
-    name: 'Greed',
-    cost: 2,
-    damage: 0,
-    type: CardType.UTILITY,
-    description: 'Draw 3 Cards.',
-    image: 'https://picsum.photos/200/300?random=28'
-  },
-  {
-    id: 'util-4',
-    name: 'Clairvoyance',
-    cost: 0,
-    damage: 0,
-    type: CardType.UTILITY,
-    description: 'Draw 1 Card.',
-    image: 'https://picsum.photos/200/300?random=29'
-  },
-  {
-    id: 'util-5',
-    name: 'Preparation',
-    cost: 1,
-    damage: 0,
-    type: CardType.UTILITY,
-    description: 'Gain 2 Soul Points.',
-    image: 'https://picsum.photos/200/300?random=30'
-  },
 
   // --- DISCARD ---
   {
@@ -253,15 +115,6 @@ export const CARDS_DB: Card[] = [
     image: 'https://picsum.photos/200/300?random=7'
   },
   {
-    id: 'disc-2',
-    name: 'Amnesia',
-    cost: 3,
-    damage: 0,
-    type: CardType.DISCARD,
-    description: 'Select 2 enemy spell slots to discard.',
-    image: 'https://picsum.photos/200/300?random=31'
-  },
-  {
     id: 'disc-3',
     name: 'Thought Theft',
     cost: 1,
@@ -269,24 +122,6 @@ export const CARDS_DB: Card[] = [
     type: CardType.DISCARD,
     description: 'Discard 1 enemy spell slot. You draw 1.',
     image: 'https://picsum.photos/200/300?random=32'
-  },
-  {
-    id: 'disc-4',
-    name: 'Mental Collapse',
-    cost: 2,
-    damage: 0,
-    type: CardType.DISCARD,
-    description: 'Discard 1 slot. Deal 10 Dmg to Front.',
-    image: 'https://picsum.photos/200/300?random=33'
-  },
-  {
-    id: 'disc-5',
-    name: 'Confusion',
-    cost: 1,
-    damage: 0,
-    type: CardType.DISCARD,
-    description: 'Discard 1 card. Target acts randomly.',
-    image: 'https://picsum.photos/200/300?random=34'
   },
 
   // --- MANIPULATION ---
@@ -307,175 +142,56 @@ export const CARDS_DB: Card[] = [
     type: CardType.MANIPULATION,
     description: 'Steal 1 Soul Point.',
     image: 'https://picsum.photos/200/300?random=9'
-  },
-  {
-    id: 'man-3',
-    name: 'Soul Infusion',
-    cost: 1,
-    damage: 0,
-    type: CardType.MANIPULATION,
-    description: 'Gain 2 Soul Points.',
-    image: 'https://picsum.photos/200/300?random=10'
-  },
-  {
-    id: 'man-4',
-    name: 'Time Warp',
-    cost: 3,
-    damage: 0,
-    type: CardType.MANIPULATION,
-    description: 'Draw 1. Reset all your slots.',
-    image: 'https://picsum.photos/200/300?random=35'
-  },
-  {
-    id: 'man-5',
-    name: 'Overload',
-    cost: 2,
-    damage: 0,
-    type: CardType.MANIPULATION,
-    description: 'Opponent loses 2 Soul Points.',
-    image: 'https://picsum.photos/200/300?random=36'
-  },
-
-  // --- INSTANT ---
-  {
-    id: 'inst-1',
-    name: 'Spell Shatter',
-    cost: 2,
-    damage: 0,
-    type: CardType.INSTANT,
-    description: 'Destroy 2 random opponent spells in slots.',
-    image: 'https://picsum.photos/200/300?random=60'
-  },
-  {
-    id: 'inst-2',
-    name: 'Equalizing Flow',
-    cost: 3,
-    damage: 0,
-    type: CardType.INSTANT,
-    description: 'Combine both players\' Soul Points and split equally.',
-    image: 'https://picsum.photos/200/300?random=61'
-  },
-  {
-    id: 'inst-3',
-    name: 'Rapid Reflex',
-    cost: 1,
-    damage: 0,
-    type: CardType.INSTANT,
-    description: 'Draw 2 cards instantly.',
-    image: 'https://picsum.photos/200/300?random=62'
-  },
-  {
-    id: 'inst-4',
-    name: 'Unstable Rift',
-    cost: 4,
-    damage: 0,
-    type: CardType.INSTANT,
-    description: 'Both players discard hand and draw 3 cards.',
-    image: 'https://picsum.photos/200/300?random=63'
-  },
-  {
-    id: 'inst-5',
-    name: 'Eagle Eye',
-    cost: 1,
-    damage: 0,
-    type: CardType.INSTANT,
-    description: 'Reveal opponent\'s hand for 5 seconds.',
-    image: 'https://picsum.photos/200/300?random=64'
   }
 ];
 
 export const CHARACTERS_DB: Character[] = [
-    {
-      id: 'char_1',
-      name: 'Sylphy',
-      maxHealth: 100,
-      currentHealth: 100,
-      position: 0,
-      passive: '+10 Heal Potency',
-      image: 'https://picsum.photos/150/150?random=10',
-      isDead: false,
-      statuses: []
-    },
-    {
-      id: 'char_2',
-      name: 'Ragnar',
-      maxHealth: 120,
-      currentHealth: 120,
-      position: 1,
-      passive: 'Reflect 5 Dmg',
-      image: 'https://picsum.photos/150/150?random=11',
-      isDead: false,
-      statuses: []
-    },
-    {
-      id: 'char_3',
-      name: 'Lyra',
-      maxHealth: 80,
-      currentHealth: 80,
-      position: 2,
-      passive: 'Spells cost -1 (min 1)',
-      image: 'https://picsum.photos/150/150?random=12',
-      isDead: false,
-      statuses: []
-    },
-    {
-      id: 'char_4',
-      name: 'Ashlen',
-      maxHealth: 100,
-      currentHealth: 100,
-      position: 0,
-      passive: 'Shield -5 Dmg',
-      image: 'https://picsum.photos/150/150?random=20',
-      isDead: false,
-      statuses: []
-    },
-    {
-      id: 'char_5',
-      name: 'Vorg',
-      maxHealth: 140,
-      currentHealth: 140,
-      position: 1,
-      passive: 'Tanky -10 Dmg',
-      image: 'https://picsum.photos/150/150?random=21',
-      isDead: false,
-      statuses: []
-    },
-    {
-      id: 'char_6',
-      name: 'Nyx',
-      maxHealth: 90,
-      currentHealth: 90,
-      position: 2,
-      passive: 'Lifesteal +10',
-      image: 'https://picsum.photos/150/150?random=22',
-      isDead: false,
-      statuses: []
-    },
-    {
-        id: 'char_7',
-        name: 'Kael',
-        maxHealth: 110,
-        currentHealth: 110,
-        position: 0,
-        passive: '+5 Attack Dmg',
-        image: 'https://picsum.photos/150/150?random=40',
-        isDead: false,
-        statuses: []
-    },
-    {
-        id: 'char_8',
-        name: 'Elara',
-        maxHealth: 85,
-        currentHealth: 85,
-        position: 0,
-        passive: 'Immune to Traps',
-        image: 'https://picsum.photos/150/150?random=41',
-        isDead: false,
-        statuses: []
-    }
+    { id: 'c1', name: 'Sylphy', maxHealth: 100, currentHealth: 100, position: 0, passive: '+10 Heal Potency', image: 'https://picsum.photos/150/150?random=10', isDead: false, statuses: [] },
+    { id: 'c2', name: 'Ragnar', maxHealth: 120, currentHealth: 120, position: 1, passive: 'Reflect 5 Dmg', image: 'https://picsum.photos/150/150?random=11', isDead: false, statuses: [] },
+    { id: 'c3', name: 'Lyra', maxHealth: 80, currentHealth: 80, position: 2, passive: 'Spells cost -1 (min 1)', image: 'https://picsum.photos/150/150?random=12', isDead: false, statuses: [] },
+    { id: 'c4', name: 'Ashlen', maxHealth: 100, currentHealth: 100, position: 0, passive: 'Shield -5 Dmg', image: 'https://picsum.photos/150/150?random=20', isDead: false, statuses: [] },
+    { id: 'c5', name: 'Vorg', maxHealth: 140, currentHealth: 140, position: 1, passive: 'Tanky -10 Dmg', image: 'https://picsum.photos/150/150?random=21', isDead: false, statuses: [] },
+    { id: 'c6', name: 'Nyx', maxHealth: 90, currentHealth: 90, position: 2, passive: 'Lifesteal +10', image: 'https://picsum.photos/150/150?random=22', isDead: false, statuses: [] }
 ];
+
+// Prebuilt Deck Archetypes
+export const PREBUILT_DECKS: Record<string, DeckLoadout> = {
+  DAMAGE: {
+    name: 'War Cry (Aggro)',
+    squad: [CHARACTERS_DB[1], CHARACTERS_DB[4], CHARACTERS_DB[5]], // Ragnar, Ashlen, Vorg
+    cards: [
+        ...Array(5).fill(CARDS_DB[0]), // Fireball
+        ...Array(5).fill(CARDS_DB[1]), // Snipe
+        ...Array(5).fill(CARDS_DB[2]), // Meteor
+        ...Array(5).fill(CARDS_DB[3]), // Ignite
+        ...Array(5).fill(CARDS_DB[8]), // Soul Harvest
+        ...Array(5).fill(CARDS_DB[9])  // Focus
+    ]
+  },
+  HEAL: {
+    name: 'Aura of Light (Control)',
+    squad: [CHARACTERS_DB[0], CHARACTERS_DB[2], CHARACTERS_DB[4]], // Sylphy, Lyra, Ashlen
+    cards: [
+        ...Array(8).fill(CARDS_DB[4]), // Nature Balm
+        ...Array(7).fill(CARDS_DB[5]), // Holy Light
+        ...Array(5).fill(CARDS_DB[0]), // Fireball (Defense)
+        ...Array(5).fill(CARDS_DB[8]), // Soul Harvest
+        ...Array(5).fill(CARDS_DB[12]) // Lockdown
+    ]
+  },
+  TRAP: {
+    name: 'Cunning Shadow (Combo)',
+    squad: [CHARACTERS_DB[2], CHARACTERS_DB[5], CHARACTERS_DB[0]], // Lyra, Nyx, Sylphy
+    cards: [
+        ...Array(8).fill(CARDS_DB[6]), // Bear Trap
+        ...Array(7).fill(CARDS_DB[7]), // Mirror Force
+        ...Array(5).fill(CARDS_DB[10]), // Mind Rot
+        ...Array(5).fill(CARDS_DB[11]), // Thought Theft
+        ...Array(5).fill(CARDS_DB[13]) // Soul Drain
+    ]
+  }
+};
 
 export const INITIAL_CHARACTERS_PLAYER: Character[] = [CHARACTERS_DB[0], CHARACTERS_DB[1], CHARACTERS_DB[2]];
 export const INITIAL_CHARACTERS_OPPONENT: Character[] = [CHARACTERS_DB[3], CHARACTERS_DB[4], CHARACTERS_DB[5]];
-
 export const MAX_SCORE = 3;
