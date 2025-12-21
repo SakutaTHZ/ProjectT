@@ -45,7 +45,7 @@ const App: React.FC = () => {
 
   const [player, setPlayer] = useState<PlayerState>({
     id: 'player',
-    name: 'Player',
+    name: localStorage.getItem('soul_rotation_name') || 'Player',
     avatar: 'https://picsum.photos/50/50?random=100',
     score: 0,
     soulPoints: 0,
@@ -252,7 +252,6 @@ const App: React.FC = () => {
     setTurnCount(1);
     setGameTime(0);
     const initialPlayerDeck = customDeck ? [...customDeck] : generateDeck(30);
-    // Shuffle the deck
     for (let i = initialPlayerDeck.length - 1; i > 0; i--) {
         const j = Math.floor(Math.random() * (i + 1));
         [initialPlayerDeck[i], initialPlayerDeck[j]] = [initialPlayerDeck[j], initialPlayerDeck[i]];
@@ -283,6 +282,7 @@ const App: React.FC = () => {
   };
 
   const startGame = (name: string, customDeck?: Card[], customCharacters?: Character[]) => {
+    setGameMode(GameMode.AI);
     setPlayer(prev => ({ ...prev, name }));
     setupBoardState(customDeck, customCharacters);
     setPhase(GamePhase.ROLL_PHASE);
@@ -342,7 +342,6 @@ const App: React.FC = () => {
       const hCount = payload.data.handCount;
       const syncHand = (prev: PlayerState) => {
           if (hCount === undefined) return prev.hand;
-          if (prev.hand.length === hCount) return prev.hand;
           const newHand = [...prev.hand];
           while(newHand.length < hCount) newHand.push({} as Card);
           while(newHand.length > hCount) newHand.pop();
@@ -374,8 +373,7 @@ const App: React.FC = () => {
       else if (payload.actionType === 'TRAP_TRIGGERED') {
            const { card, currentSoulPoints } = payload.data;
            if (card) {
-               addLog(`TRAP TRIGGERED! ${card.name}!`, 'opponent');
-               // Target of the trap is the player (ME)
+               addLog(`OPPONENT TRAP: ${card.name}!`, 'opponent');
                executeSpell(opponentRef.current, setOpponent, playerRef.current, setPlayer, card, playerRef.current.board.find(c => c.position === 0)?.id || '', -1);
                if (currentSoulPoints !== undefined) setOpponent(prev => ({ ...prev, soulPoints: currentSoulPoints }));
            }
@@ -395,6 +393,11 @@ const App: React.FC = () => {
           const winnerName = winnerId === playerRef.current.id ? playerRef.current.name : opponentRef.current.name;
           addLog(`${winnerName} wins the match!`, 'system');
           setNotification(`${winnerName} Won!`);
+          if (winnerId !== playerRef.current.id) {
+              setOpponent(prev => ({ ...prev, score: MAX_SCORE }));
+          } else {
+              setPlayer(prev => ({ ...prev, score: MAX_SCORE }));
+          }
       }
       else if (payload.actionType === 'END_TURN') {
           addLog("Opponent ended turn.", 'opponent');
@@ -426,7 +429,7 @@ const App: React.FC = () => {
             const activeChar = prev.board.find(c => c.position === 0);
             const isStunned = activeChar?.statuses.some(s => s.type === StatusType.STUN);
             let newBoard = prev.board;
-            if (isStunned) addLog("Active Character Stunned! Rotation Locked.", 'system');
+            if (isStunned) addLog("Rotation Locked by Stun!", 'system');
             else {
                 newBoard = rotateCharacters(prev.board);
                 if (gameMode === GameMode.ONLINE) socketService.sendAction({ actionType: 'ROTATE', data: {} });
@@ -445,11 +448,11 @@ const App: React.FC = () => {
       if (isProcessing) return;
       let slotIndex = -1;
       if (targetSlotIndex !== undefined) {
-          if (player.disabledSlots.includes(targetSlotIndex)) { addLog("Slot is DISABLED!", 'system'); return; }
+          if (player.disabledSlots.includes(targetSlotIndex)) { addLog("Slot Locked!", 'system'); return; }
           if (player.slots[targetSlotIndex] === null) slotIndex = targetSlotIndex;
-          else { addLog("Slot is occupied!", 'system'); return; }
+          else { addLog("Slot Occupied!", 'system'); return; }
       } else slotIndex = player.slots.findIndex((s, idx) => s === null && !player.disabledSlots.includes(idx));
-      if (slotIndex === -1) { addLog("No available slots!", 'system'); return; }
+      if (slotIndex === -1) { addLog("No open slots!", 'system'); return; }
 
       setPlayer(prev => {
           const newSlots = [...prev.slots];
@@ -458,14 +461,14 @@ const App: React.FC = () => {
           if (gameMode === GameMode.ONLINE) socketService.sendAction({ actionType: 'PLACE_CARD', data: { card, slotIndex, handCount: nextHand.length } });
           return { ...prev, slots: newSlots, hand: nextHand };
       });
-      addLog(`Set ${card.name} in Slot ${slotIndex + 1}.`, 'player');
+      addLog(`Set ${card.name}.`, 'player');
   };
 
   const burnCardInSlot = (e: React.MouseEvent, slotIndex: number) => {
       e.stopPropagation(); 
       if (isProcessing || !player.slots[slotIndex]) return;
       const slot = player.slots[slotIndex]!;
-      if (!slot.isReady) { addLog("Can only sacrifice active spells!", 'system'); return; }
+      if (!slot.isReady) { addLog("Must be active to sacrifice!", 'system'); return; }
       const nextSoulPoints = player.soulPoints + 1;
       setIsProcessing(true);
       setBurningSlotIndex(slotIndex);
@@ -476,56 +479,54 @@ const App: React.FC = () => {
               if (gameMode === GameMode.ONLINE) socketService.sendAction({ actionType: 'BURN_CARD', data: { slotIndex, currentSoulPoints: nextSoulPoints, handCount: prev.hand.length } });
               return { ...prev, slots: newSlots, soulPoints: nextSoulPoints, discard: [...prev.discard, slot.card] };
           });
-          addLog(`Sacrificed ${slot.card.name} for +1 Soul Point.`, 'player');
+          addLog(`Sacrificed ${slot.card.name} for +1 SP.`, 'player');
           setBurningSlotIndex(null);
           setIsProcessing(false);
       }, 700);
   };
 
-  const handleDragStart = (e: React.DragEvent, card: Card) => { e.dataTransfer.setData("cardId", card.id); e.dataTransfer.effectAllowed = "move"; };
-  const handleDragOver = (e: React.DragEvent) => { e.preventDefault(); e.dataTransfer.dropEffect = "move"; };
+  const handleDragStart = (e: React.DragEvent, card: Card) => { e.dataTransfer.setData("cardId", card.id); };
+  const handleDragOver = (e: React.DragEvent) => { e.preventDefault(); };
   const handleDrop = (e: React.DragEvent, slotIndex: number) => {
       e.preventDefault();
       if (isProcessing || phase !== GamePhase.MAIN_PHASE || !player.isTurn) return;
       const cardId = e.dataTransfer.getData("cardId");
       const card = player.hand.find(c => c.id === cardId);
-      if (card) { if (card.type === CardType.INSTANT) addLog("Instant spells cannot be placed in slots!", "system"); else placeCardInSlot(card, slotIndex); }
+      if (card) { if (card.type === CardType.INSTANT) addLog("Instants can't be set!", "system"); else placeCardInSlot(card, slotIndex); }
   };
   
   const handleHandCardClick = (card: Card) => { 
       if (phase !== GamePhase.MAIN_PHASE || !player.isTurn || isProcessing) return;
       if (card.type === CardType.INSTANT) {
           const cost = getEffectiveCost(card, player);
-          if (player.soulPoints < cost) { addLog("Not enough Soul Points!", 'system'); return; }
+          if (player.soulPoints < cost) { addLog("Low Soul Points!", 'system'); return; }
           handleSpellExecution(player, setPlayer, opponent, setOpponent, card, '', -1); 
       } else placeCardInSlot(card); 
   };
 
   const handleSlotCardClick = (slotIndex: number) => {
     if (isProcessing || phase !== GamePhase.MAIN_PHASE || !player.isTurn) return;
-    if (player.disabledSlots.includes(slotIndex)) { addLog("Slot is DISABLED!", 'system'); return; }
+    if (player.disabledSlots.includes(slotIndex)) { addLog("Slot Disabled!", 'system'); return; }
     const slot = player.slots[slotIndex];
     if (!slot || !slot.isReady) return;
     const card = slot.card;
     const cost = getEffectiveCost(card, player);
-    if (player.soulPoints < cost) { addLog("Not enough Soul Points!", 'system'); return; }
+    if (player.soulPoints < cost) { addLog("Not enough SP!", 'system'); return; }
     
-    // Direct Self-Cast Spells
     if (["Soul Harvest", "Soul Infusion", "Greed", "Focus", "Preparation", "Clairvoyance", "Spell Shatter", "Equalizing Flow", "Rapid Reflex", "Unstable Rift", "Eagle Eye"].includes(card.name)) { 
         handleSpellExecution(player, setPlayer, player, setPlayer, card, player.id, slotIndex); return; 
     }
     
-    // Target Selection Spells
     if (["Mind Rot", "Amnesia", "Thought Theft", "Soul Drain", "Lockdown"].includes(card.name) || card.type === CardType.DISCARD) { 
         setSelectedCardId(card.id);
-        addLog(`Select enemy SPELL SLOT to discard.`, 'system');
+        addLog(`Select enemy spell slot to disrupt.`, 'system');
         return; 
     }
     
     if (selectedCardId === card.id) setSelectedCardId(null);
     else {
       setSelectedCardId(card.id);
-      addLog(`Select a target ${card.canTargetBackline ? "(Any Position)" : "(Front Only)"}`, 'system');
+      addLog(`Select target ${card.canTargetBackline ? "(Any)" : "(Frontline)"}`, 'system');
     }
   };
 
@@ -559,7 +560,6 @@ const App: React.FC = () => {
     const card = player.slots[slotIndex]!.card;
     if (card.type === CardType.ATTACK && !isEnemy) return;
     if (card.type === CardType.HEAL && isEnemy) return;
-    if (card.name === "Lockdown" || card.type === CardType.DISCARD) return;
     handleSpellExecution(player, setPlayer, isEnemy ? opponent : player, isEnemy ? setOpponent : setPlayer, card, target.id, slotIndex);
     setSelectedCardId(null);
   };
@@ -580,7 +580,6 @@ const App: React.FC = () => {
     targeter: PlayerState, setTargeter: React.Dispatch<React.SetStateAction<PlayerState>>, 
     card: Card, targetId: string, slotIndex: number, effectTargetSlotIndex?: number
   ) => {
-      // TRAP CHECK: Triggered when casting on Enemy slots
       if (caster.id === 'player' && targeter.id === 'opponent' && effectTargetSlotIndex !== undefined && card.type === CardType.DISCARD) {
           const trapIdx = targeter.slots.findIndex(s => s && s.isReady && s.card.type === CardType.TRAP);
           if (trapIdx !== -1) {
@@ -591,16 +590,13 @@ const App: React.FC = () => {
                   const trapCard = trapSlot.card;
                   const nextOpponentSP = targeter.soulPoints - trapCost;
                   
-                  // Trigger Trap Effect on Me (attacker)
                   executeSpell(targeter, setTargeter, caster, setCaster, trapCard, caster.board.find(c => c.position === 0)?.id || '', -1);
                   
-                  // Consume Trap
                   setTargeter(prev => { 
                       const n = [...prev.slots]; n[trapIdx] = null; 
                       return { ...prev, slots: n, soulPoints: nextOpponentSP, discard: [...prev.discard, trapCard] }; 
                   });
                   
-                  // Consume Attacker Spell and SP (negated effect)
                   setCaster(prev => {
                       const cCost = getEffectiveCost(card, prev);
                       const nSlots = [...prev.slots]; if (slotIndex >= 0) nSlots[slotIndex] = null;
@@ -637,7 +633,7 @@ const App: React.FC = () => {
     if (isProcessing || targetId === 'COUNTERED') return;
     setIsProcessing(true);
     if (slotIndex >= 0) setCastingSlot({ playerId: caster.id, slotIndex });
-    addLog(`${caster.name} cast ${card.name}!`, caster.id === 'player' ? 'player' : 'opponent');
+    addLog(`${caster.name} used ${card.name}!`, caster.id === 'player' ? 'player' : 'opponent');
     
     setTimeout(() => {
         const activeCasterChar = caster.board.find(c => c.position === 0);
@@ -728,37 +724,26 @@ const App: React.FC = () => {
     setSelectedCardId(null);
     setPlayer(prev => ({ ...prev, isTurn: false, diceRolled: false, disabledSlots: [] }));
     setIsOpponentHandRevealed(false);
-    addLog("Ended Turn.", 'player');
-    if (gameMode === GameMode.ONLINE) {
-        socketService.sendAction({ actionType: 'END_TURN', data: { handCount: player.hand.length } });
-    }
+    addLog("End Turn.", 'player');
+    if (gameMode === GameMode.ONLINE) socketService.sendAction({ actionType: 'END_TURN', data: { handCount: player.hand.length } });
     
-    if (gameMode === GameMode.AI) {
-        setPhase(GamePhase.OPPONENT_THINKING);
-        setNotification("Opponent's Turn");
-    } else {
-        setPhase(GamePhase.OPPONENT_THINKING);
-        setNotification("Opponent's Turn");
-    }
+    setPhase(GamePhase.OPPONENT_THINKING);
+    setNotification(`${opponent.name}'s Turn`);
   };
 
-  // Dedicated AI Sequence Logic
   useEffect(() => {
     if (gameMode === GameMode.AI && phase === GamePhase.OPPONENT_THINKING) {
       const runAI = async () => {
         if (phaseRef.current === GamePhase.GAME_OVER) return;
         
-        // 1. Draw Step
-        await new Promise(r => setTimeout(r, 1000));
+        await new Promise(r => setTimeout(r, 1200));
         setOpponent(prev => processTurnStart(drawCard(prev, DRAW_PER_TURN)));
         
-        // 2. Roll Step
         await new Promise(r => setTimeout(r, 1000));
         const roll = Math.floor(Math.random() * 3) + 1;
         setOpponent(prev => ({ ...prev, soulPoints: prev.soulPoints + roll, slots: prev.slots.map(s => s ? { ...s, isReady: true } : null) }));
         addLog(`${opponent.name} rolled ${roll}.`, 'opponent');
 
-        // 3. Rotate Step
         await new Promise(r => setTimeout(r, 1000));
         setOpponent(prev => {
             const active = prev.board.find(c => c.position === 0);
@@ -766,14 +751,13 @@ const App: React.FC = () => {
             return { ...prev, board: rotateCharacters(prev.board) };
         });
 
-        // 4. Action Step (Cast a spell if possible)
         await new Promise(r => setTimeout(r, 1000));
         const currentOpp = opponentRef.current;
         const playable = currentOpp.slots.map((s, i) => ({ s, i }))
             .filter(item => item.s && item.s.isReady && item.s.card.cost <= currentOpp.soulPoints && !currentOpp.disabledSlots.includes(item.i));
         
         if (playable.length > 0) {
-            const pick = playable[0]; // Simplistic AI pick
+            const pick = playable[0]; 
             const card = pick.s!.card;
             let tid: string | undefined;
             if (card.type === CardType.ATTACK) tid = playerRef.current.board.find(c => c.position === 0 && !c.isDead)?.id;
@@ -785,7 +769,6 @@ const App: React.FC = () => {
             }
         }
 
-        // 5. Setup Step (Place cards in slots)
         setOpponent(prev => {
             const ns = [...prev.slots]; 
             const nh = [...prev.hand];
@@ -801,14 +784,13 @@ const App: React.FC = () => {
             return { ...prev, slots: ns, hand: nh };
         });
 
-        // 6. End Step
         await new Promise(r => setTimeout(r, 1500));
         setOpponent(prev => ({ ...prev, disabledSlots: [] }));
-        setPlayer(prev => processTurnStart(drawCard(prev, DRAW_PER_TURN)));
+        setPlayer(prev => ({ ...processTurnStart(drawCard(prev, DRAW_PER_TURN)), isTurn: true, diceRolled: false }));
         setTurnCount(prev => prev + 1); 
         setPhase(GamePhase.ROLL_PHASE); 
         setShowDiceOverlay(true);
-        addLog("Your Turn!", 'system');
+        addLog(`${player.name}'s Turn!`, 'system');
       };
       runAI();
     }
@@ -870,7 +852,7 @@ const App: React.FC = () => {
         player={player} phase={phase} selectedCardId={selectedCardId} castingSlotIndex={castingSlot?.playerId === 'player' ? castingSlot.slotIndex : null} burningSlotIndex={burningSlotIndex}
         getEffectiveCost={(c) => getEffectiveCost(c, player)} onCharacterClick={handleTargetClick} isValidTarget={isCharacterValidTarget}
         onDragOver={handleDragOver} onDrop={handleDrop} onSlotCardClick={handleSlotCardClick} onBurnCard={burnCardInSlot}
-        onInspectCard={(c) => setInspectedItem(c)} onResetPlacedSpells={resetPlacedSpells} onHandCardClick={handleHandCardClick} onDragStart={handleDragStart} onLogDeck={() => addLog(`Deck: ${player.deck.length} cards remaining.`, 'player')}
+        onInspectCard={(c) => setInspectedItem(c)} onResetPlacedSpells={resetPlacedSpells} onHandCardClick={handleHandCardClick} onDragStart={handleDragStart} onLogDeck={() => addLog(`Deck: ${player.deck.length} remaining.`, 'player')}
       />
       {phase === GamePhase.GAME_OVER && <GameOverScreen score={player.score} notification={notification} onReset={resetGame} onGoHome={() => setPhase(GamePhase.START)} />}
       <GameLog logs={gameLog} show={showLog} onClose={() => setShowLog(false)} />
