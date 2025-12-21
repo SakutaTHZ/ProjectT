@@ -103,7 +103,10 @@ const DeckBuilderScreen: React.FC<Props> = ({ onBack, onStartGame }) => {
   const handleStart = () => {
       if (currentDeck.length === DECK_SIZE_LIMIT && selectedCharacters.length === SQUAD_SIZE_LIMIT) {
           saveLoadout();
+          // Pass the actual current state to start the game
           onStartGame(currentDeck, selectedCharacters);
+      } else {
+          showNotification(`Need ${DECK_SIZE_LIMIT} cards and ${SQUAD_SIZE_LIMIT} characters!`);
       }
   };
 
@@ -236,7 +239,7 @@ const DeckBuilderScreen: React.FC<Props> = ({ onBack, onStartGame }) => {
                               <div key={idx} className="flex items-center gap-3 bg-neutral-900 p-2 rounded border border-neutral-800">
                                   <img src={char.image} className="w-10 h-10 object-cover rounded border border-neutral-700" alt={char.name}/>
                                   <div className="flex-1 font-fantasy text-yellow-100 text-xs">{char.name}</div>
-                                  <button onClick={() => toggleCharacter(char)} className="text-red-500"><Trash2 size={14} /></button>
+                                  <button onClick={() => setSelectedCharacters(prev => prev.filter(c => c.name !== char.name))} className="text-red-500"><Trash2 size={14} /></button>
                               </div>
                           ))}
                       </div>

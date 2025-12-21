@@ -45,7 +45,7 @@ const App: React.FC = () => {
 
   const [player, setPlayer] = useState<PlayerState>({
     id: 'player',
-    name: 'SakutaTHZ',
+    name: 'Player',
     avatar: 'https://picsum.photos/50/50?random=100',
     score: 0,
     soulPoints: 0,
@@ -252,7 +252,7 @@ const App: React.FC = () => {
     setTurnCount(1);
     setGameTime(0);
     const initialPlayerDeck = customDeck ? [...customDeck] : generateDeck(30);
-    // Shuffle the deck if it's from custom to ensure variety
+    // Shuffle the deck
     for (let i = initialPlayerDeck.length - 1; i > 0; i--) {
         const j = Math.floor(Math.random() * (i + 1));
         [initialPlayerDeck[i], initialPlayerDeck[j]] = [initialPlayerDeck[j], initialPlayerDeck[i]];
@@ -374,7 +374,7 @@ const App: React.FC = () => {
       else if (payload.actionType === 'TRAP_TRIGGERED') {
            const { card, currentSoulPoints } = payload.data;
            if (card) {
-               addLog(`OPPONENT'S TRAP TRIGGERED: ${card.name}!`, 'opponent');
+               addLog(`TRAP TRIGGERED! ${card.name}!`, 'opponent');
                // Target of the trap is the player (ME)
                executeSpell(opponentRef.current, setOpponent, playerRef.current, setPlayer, card, playerRef.current.board.find(c => c.position === 0)?.id || '', -1);
                if (currentSoulPoints !== undefined) setOpponent(prev => ({ ...prev, soulPoints: currentSoulPoints }));
@@ -389,6 +389,13 @@ const App: React.FC = () => {
              }
           }
       }
+      else if (payload.actionType === 'GAME_OVER') {
+          setPhase(GamePhase.GAME_OVER);
+          const winnerId = payload.data.winnerId;
+          const winnerName = winnerId === playerRef.current.id ? playerRef.current.name : opponentRef.current.name;
+          addLog(`${winnerName} wins the match!`, 'system');
+          setNotification(`${winnerName} Won!`);
+      }
       else if (payload.actionType === 'END_TURN') {
           addLog("Opponent ended turn.", 'opponent');
           setIsOpponentHandRevealed(false);
@@ -396,15 +403,6 @@ const App: React.FC = () => {
           setPlayer(prev => {
              const p = drawCard(prev, DRAW_PER_TURN);
              const processedP = processTurnStart(p);
-             const allDead = processedP.board.every(c => c.isDead);
-             if (allDead) {
-                 setTimeout(() => {
-                     setPhase(GamePhase.GAME_OVER);
-                     setOpponent(o => ({...o, score: MAX_SCORE}));
-                     addLog("DEFEAT! Your party has fallen.", 'system');
-                     if(gameMode === GameMode.ONLINE) socketService.sendAction({ actionType: 'GAME_OVER', data: { winnerId: opponentRef.current.id } });
-                 }, 500);
-             }
              return { ...processedP, isTurn: true, diceRolled: false };
           });
           if (phaseRef.current !== GamePhase.GAME_OVER) {
@@ -593,7 +591,7 @@ const App: React.FC = () => {
                   const trapCard = trapSlot.card;
                   const nextOpponentSP = targeter.soulPoints - trapCost;
                   
-                  // Trigger Trap Effect on Me
+                  // Trigger Trap Effect on Me (attacker)
                   executeSpell(targeter, setTargeter, caster, setCaster, trapCard, caster.board.find(c => c.position === 0)?.id || '', -1);
                   
                   // Consume Trap
@@ -602,7 +600,7 @@ const App: React.FC = () => {
                       return { ...prev, slots: n, soulPoints: nextOpponentSP, discard: [...prev.discard, trapCard] }; 
                   });
                   
-                  // Consume Attacker Spell and SP (but negate effect)
+                  // Consume Attacker Spell and SP (negated effect)
                   setCaster(prev => {
                       const cCost = getEffectiveCost(card, prev);
                       const nSlots = [...prev.slots]; if (slotIndex >= 0) nSlots[slotIndex] = null;
@@ -718,7 +716,9 @@ const App: React.FC = () => {
         if (newScore >= MAX_SCORE || newTargetBoard.every(c => c.isDead)) {
             setPhase(GamePhase.GAME_OVER);
             addLog(caster.id === 'player' ? "VICTORY!" : "DEFEAT!", 'system');
-            if (gameMode === GameMode.ONLINE && caster.id === 'player') socketService.sendAction({ actionType: 'GAME_OVER', data: { winnerId: caster.id } });
+            if (gameMode === GameMode.ONLINE && caster.id === 'player') {
+                socketService.sendAction({ actionType: 'GAME_OVER', data: { winnerId: caster.id } });
+            }
         }
     }, 700);
   };
@@ -728,47 +728,87 @@ const App: React.FC = () => {
     setSelectedCardId(null);
     setPlayer(prev => ({ ...prev, isTurn: false, diceRolled: false, disabledSlots: [] }));
     setIsOpponentHandRevealed(false);
-    setOpponent(prev => processTurnStart(drawCard(prev, DRAW_PER_TURN)));
     addLog("Ended Turn.", 'player');
-    if (gameMode === GameMode.ONLINE) socketService.sendAction({ actionType: 'END_TURN', data: { handCount: player.hand.length } });
-    setTimeout(() => { if (phaseRef.current !== GamePhase.GAME_OVER) { setPhase(GamePhase.OPPONENT_THINKING); setNotification("Opponent's Turn"); } }, 500);
+    if (gameMode === GameMode.ONLINE) {
+        socketService.sendAction({ actionType: 'END_TURN', data: { handCount: player.hand.length } });
+    }
+    
+    if (gameMode === GameMode.AI) {
+        setPhase(GamePhase.OPPONENT_THINKING);
+        setNotification("Opponent's Turn");
+    } else {
+        setPhase(GamePhase.OPPONENT_THINKING);
+        setNotification("Opponent's Turn");
+    }
   };
 
+  // Dedicated AI Sequence Logic
   useEffect(() => {
     if (gameMode === GameMode.AI && phase === GamePhase.OPPONENT_THINKING) {
       const runAI = async () => {
-        await new Promise(r => setTimeout(r, 1000));
         if (phaseRef.current === GamePhase.GAME_OVER) return;
-        setOpponent(prev => drawCard(prev, DRAW_PER_TURN));
+        
+        // 1. Draw Step
+        await new Promise(r => setTimeout(r, 1000));
+        setOpponent(prev => processTurnStart(drawCard(prev, DRAW_PER_TURN)));
+        
+        // 2. Roll Step
         await new Promise(r => setTimeout(r, 1000));
         const roll = Math.floor(Math.random() * 3) + 1;
         setOpponent(prev => ({ ...prev, soulPoints: prev.soulPoints + roll, slots: prev.slots.map(s => s ? { ...s, isReady: true } : null) }));
+        addLog(`${opponent.name} rolled ${roll}.`, 'opponent');
+
+        // 3. Rotate Step
         await new Promise(r => setTimeout(r, 1000));
         setOpponent(prev => {
             const active = prev.board.find(c => c.position === 0);
-            return active?.statuses.some(s => s.type === StatusType.STUN) ? prev : { ...prev, board: rotateCharacters(prev.board) };
+            if (active?.statuses.some(s => s.type === StatusType.STUN)) return prev;
+            return { ...prev, board: rotateCharacters(prev.board) };
         });
+
+        // 4. Action Step (Cast a spell if possible)
         await new Promise(r => setTimeout(r, 1000));
-        const updatedOpp = opponentRef.current;
-        const playable = updatedOpp.slots.map((s, i) => ({ s, i })).filter(item => item.s && item.s.isReady && item.s.card.cost <= updatedOpp.soulPoints && !updatedOpp.disabledSlots.includes(item.i));
+        const currentOpp = opponentRef.current;
+        const playable = currentOpp.slots.map((s, i) => ({ s, i }))
+            .filter(item => item.s && item.s.isReady && item.s.card.cost <= currentOpp.soulPoints && !currentOpp.disabledSlots.includes(item.i));
+        
         if (playable.length > 0) {
-            const pick = playable[Math.floor(Math.random() * playable.length)];
+            const pick = playable[0]; // Simplistic AI pick
             const card = pick.s!.card;
             let tid: string | undefined;
             if (card.type === CardType.ATTACK) tid = playerRef.current.board.find(c => c.position === 0 && !c.isDead)?.id;
-            else if (card.type === CardType.HEAL) tid = updatedOpp.board.find(c => c.currentHealth < c.maxHealth && !c.isDead)?.id;
-            if (tid) await new Promise(r => { executeSpell(updatedOpp, setOpponent, playerRef.current, setPlayer, card, tid!, pick.i); setTimeout(r, 1000); });
+            else if (card.type === CardType.HEAL) tid = currentOpp.board.find(c => c.currentHealth < c.maxHealth && !c.isDead)?.id;
+            
+            if (tid) {
+                executeSpell(currentOpp, setOpponent, playerRef.current, setPlayer, card, tid, pick.i);
+                await new Promise(r => setTimeout(r, 1500));
+            }
         }
-        await new Promise(r => setTimeout(r, 1000));
+
+        // 5. Setup Step (Place cards in slots)
         setOpponent(prev => {
-            const ns = [...prev.slots]; const nh = [...prev.hand];
-            for (let i = 0; i < ns.length; i++) { if (ns[i] === null && nh.length > 0 && !prev.disabledSlots.includes(i)) { const ci = nh.findIndex(c => c.type !== CardType.INSTANT); if (ci >= 0) { ns[i] = { instanceId: nh[ci].id, card: nh[ci], isReady: false }; nh.splice(ci, 1); } } }
+            const ns = [...prev.slots]; 
+            const nh = [...prev.hand];
+            for (let i = 0; i < ns.length; i++) { 
+                if (ns[i] === null && nh.length > 0 && !prev.disabledSlots.includes(i)) { 
+                    const ci = nh.findIndex(c => c.type !== CardType.INSTANT); 
+                    if (ci >= 0) { 
+                        ns[i] = { instanceId: nh[ci].id, card: nh[ci], isReady: false }; 
+                        nh.splice(ci, 1); 
+                    } 
+                } 
+            }
             return { ...prev, slots: ns, hand: nh };
         });
-        await new Promise(r => setTimeout(r, 2000));
+
+        // 6. End Step
+        await new Promise(r => setTimeout(r, 1500));
         setOpponent(prev => ({ ...prev, disabledSlots: [] }));
         setPlayer(prev => processTurnStart(drawCard(prev, DRAW_PER_TURN)));
-        setTurnCount(prev => prev + 1); setPhase(GamePhase.ROLL_PHASE); setShowDiceOverlay(true);
+        setTurnCount(prev => prev + 1); 
+        setPhase(GamePhase.ROLL_PHASE); 
+        setShowDiceOverlay(true);
+        addLog("Your Turn!", 'system');
       };
       runAI();
     }
